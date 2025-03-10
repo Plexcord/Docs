@@ -1,0 +1,149 @@
+---
+sidebar_position: 1
+title: Installing Plexcord
+style: ../../src/css/custom.css
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+# Installing Plexcord
+
+## Prerequisites
+
+Plexcord is powered by Node.js, git and pnpm, so you will have to install all of those before you can get started:
+
+- [Download git](https://git-scm.com/downloads)
+- [Download Node.js](https://nodejs.org/en/download/)
+- [Download pnpm](https://pnpm.io/installation)
+
+Make sure that all of them are added to your PATH, you will need it.
+
+To verify correct installation, run the following commands. All 3 should print the version of the respective software without errors:
+
+```sh
+git --version
+node --version
+pnpm --version
+```
+
+## Cloning the Plexcord Repository
+
+Next, you should check out the Plexcord source code!
+
+Pick a convenient folder that you can remember, for example your Documents folder.
+Open a terminal and point it to the desired folder:
+```sh
+cd Documents
+```
+Then, clone the Plexcord repository:
+```sh
+git clone https://github.com/MutanPlex/Plexcord
+```
+and finally point your terminal to the newly created Plexcord folder:
+```sh
+cd Plexcord
+```
+:::tip
+Whenever you open a new terminal, you will have to navigate to the Plexcord folder again.
+If you stuck to the example above, the command to do this would be:
+```sh
+cd Documents/Plexcord
+```
+:::
+
+
+
+## Installing Dependencies
+
+The next step is installing Plexcord's dependencies. We use the `pnpm` package manager. Please do not use `npm` or `yarn`!
+
+Issue the following command:
+```sh
+pnpm install --frozen-lockfile
+```
+
+:::warning
+Plexcord might add, remove or update dependencies at any time.
+Thus, you might receive errors like `Cannot find package "foobar" imported from ...` after updating.
+
+If this happens, you should run the same command once again to update the installed dependencies.
+:::
+
+## Building Plexcord
+
+Now you're almost done! The last step is compiling the Plexcord code.
+
+The steps for this will differ depending on which platform you want to build for.
+
+<Tabs groupId="platform">
+  <TabItem label="Discord Desktop" value="desktop" default>
+        ```sh
+        pnpm build
+        ```
+    </TabItem>
+    <TabItem label="Plextron" value="plextron">
+        ```sh
+        pnpm build
+        ```
+    </TabItem>
+    <TabItem label="Web Browser" value="web">
+        ```sh
+        pnpm buildWeb
+        ```
+    </TabItem>
+</Tabs>
+
+:::tip
+You can build a Development Build of Plexcord by appending `--dev` to the build command, for example `pnpm build --dev`.
+This gives you access to development tools like PatchHelper.
+:::
+
+:::caution
+Whenever you make changes to the source code, you will have to rebuild Plexcord to apply your changes.
+To do so, simply run the same build command again.
+
+Since this becomes tedious quickly, we also provide a command that watches for changes and rebuilds automatically whenever you make changes.
+Simply add the `--watch` flag, for example `pnpm buildWeb --watch`!
+:::
+
+## Installing your custom build
+
+You're done! Now you can install your custom build of Plexcord.
+
+The installation process differs depending on the platform you want to install on.
+
+<Tabs groupId="platform">
+    <TabItem label="Discord Desktop" value="desktop">
+        Run
+        ```sh
+        pnpm inject
+        ```
+        This will launch the Plexcord Installer. Just patch the desired Plexcord install and you're done!
+    </TabItem>
+
+    <TabItem label="Plextron" value="plextron">
+        1. Open Plextron
+        2. Go to the Plextron Settings category
+        3. Scroll down all the way to the `Plexcord Location` section
+        4. Press `Change` and select the `dist` folder in your Plexcord directory. For example, if you stuck to the example above, you would select `Documents/Plexcord/dist`
+        5. Fully close and restart Plextron and you're done!
+        
+        :::tip
+        If you are using the Plextron flatpak on Linux, the path might turn into `/run/1000/...`.
+            This is a temporary path granted by the flatpak runtime and might break after a restart.
+
+            You should grant the Plextron flatpak access to the Plexcord directory to solve this issue, for example via
+            ```sh
+            flatpak override dev.plexcord.Plextron --filesystem="$HOME/Documents/Plexcord"
+            ```
+        :::
+    </TabItem>
+
+    <TabItem label="Web Browser" value="web">
+        You will find three builds in the `dist` folder:
+        - **extension-chrome.zip**: Extension for Chrome and Chromium-based browsers. To install, head to `chrome://extensions`, enable Developer Mode and drag the zip file into the window
+        - **extension-firefox.zip**: Extension for Firefox. To install, head to `about:addons`, click the gear icon and select `Install Add-on From File...`
+        - **Plexcord.user.js**: Userscript for Tampermonkey, Greasemonkey and other userscript managers. Just open it with your Browser and your userscript manager should automatically prompt you to install it
+    </TabItem>
+</Tabs>
