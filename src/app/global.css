@@ -1,0 +1,180 @@
+@import 'tailwindcss';
+
+@import 'fumadocs-ui/css/neutral.css';
+@import 'fumadocs-ui/css/preset.css';
+
+/* Plexcord Purple Theme - Override Fumadocs colors */
+@theme {
+  /* Primary Purple - #6e1beb */
+  --color-fd-primary: hsl(277, 88%, 51%);
+  --color-fd-primary-foreground: hsl(0, 0%, 100%);
+  
+  /* Accent */
+  --color-fd-accent: hsla(280, 70%, 70%, 50%);
+  --color-fd-accent-foreground: hsl(277, 88%, 20%);
+  
+  /* Secondary */
+  --color-fd-secondary: hsl(280, 60%, 85%);
+  --color-fd-secondary-foreground: hsl(277, 88%, 30%);
+  
+  /* Ring */
+  --color-fd-ring: hsl(277, 88%, 51%);
+}
+
+@theme static {
+  /* Diff colors for code blocks - override defaults */
+  --color-fd-diff-remove: rgba(200, 10, 100, 0.12);
+  --color-fd-diff-remove-symbol: rgb(230, 10, 100);
+  --color-fd-diff-add: rgba(14, 180, 100, 0.1);
+  --color-fd-diff-add-symbol: rgb(10, 200, 100);
+}
+
+.dark {
+  /* Dark Mode Purple Theme */
+  --color-fd-primary: hsl(277, 85%, 65%);
+  --color-fd-primary-foreground: hsl(277, 20%, 5%);
+  
+  /* Accent */
+  --color-fd-accent: hsla(280, 75%, 55%, 30%);
+  --color-fd-accent-foreground: hsl(0, 0%, 100%);
+  
+  /* Backgrounds - purple tinted */
+  --color-fd-background: hsl(277, 25%, 8%);
+  --color-fd-foreground: hsl(277, 10%, 95%);
+  
+  /* Cards */
+  --color-fd-card: hsl(277, 20%, 12%);
+  --color-fd-card-foreground: hsl(277, 10%, 95%);
+  
+  /* Popovers */
+  --color-fd-popover: hsl(277, 20%, 10%);
+  --color-fd-popover-foreground: hsl(277, 10%, 95%);
+  
+  /* Muted */
+  --color-fd-muted: hsl(277, 15%, 16%);
+  --color-fd-muted-foreground: hsla(277, 10%, 65%, 0.8);
+  
+  /* Borders */
+  --color-fd-border: hsla(277, 15%, 40%, 20%);
+  
+  /* Secondary */
+  --color-fd-secondary: hsl(280, 40%, 20%);
+  --color-fd-secondary-foreground: hsl(277, 85%, 75%);
+  
+  /* Ring */
+  --color-fd-ring: hsl(277, 85%, 65%);
+}
+
+/* Custom TOC styling */
+[data-toc] {
+  @apply sticky top-20;
+}
+
+[data-toc] a {
+  @apply transition-all duration-200;
+}
+
+[data-toc] a[data-active='true'] {
+  @apply font-semibold text-fd-primary;
+}
+
+[data-toc] a:hover {
+  @apply text-fd-primary/80;
+}
+
+/* Sidebar styling */
+[data-sidebar] {
+  @apply border-r border-fd-border;
+}
+
+[data-sidebar] a[data-active='true'] {
+  @apply bg-fd-primary/10 text-fd-primary border-l-2 border-fd-primary;
+}
+
+/* Animated border rotation for code blocks */
+@keyframes border-rotate {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-border-rotate {
+  animation: border-rotate 3s linear infinite;
+}
+
+/* 3D Grid Perspective Animation for CTA section */
+.perspective-container {
+  perspective: 1200px;
+  perspective-origin: 50% 0%;
+}
+
+@keyframes grid-perspective {
+  0% {
+    transform: rotateX(45deg) translateY(0px) translateZ(0px);
+  }
+  100% {
+    transform: rotateX(45deg) translateY(80px) translateZ(0px);
+  }
+}
+
+@keyframes diagonal-move {
+  0% {
+    background-position: 0px 0px, 0px 0px;
+  }
+  100% {
+    background-position: 80px 80px, -80px -80px;
+  }
+}
+
+/* Feature Card Pattern Animations - Subtle and Smooth */
+
+/* Diagonal lines movement - background position only */
+@keyframes feature-diagonal-move {
+  0% {
+    background-position: 0px 0px;
+  }
+  100% {
+    background-position: 50px 50px;
+  }
+}
+
+/* Shooting star meteor effect */
+@keyframes feature-meteor {
+  0% {
+    transform: translateX(-100%) translateY(-100%);
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(100%) translateY(100%);
+    opacity: 0;
+  }
+}
+
+/* Dot pattern subtle pulse */
+@keyframes feature-dots-pulse {
+  0%, 100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+/* Grid fade breathing effect */
+@keyframes feature-grid-fade {
+  0%, 100% {
+    opacity: 0.25;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}

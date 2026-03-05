@@ -1,0 +1,299 @@
+﻿---
+title: Webpack Module Access
+description: Access Discord's internal modules using Plexcord's Webpack API. Covers find, findByCode, findByProps, waitFor, and common exports.
+published: 2026-03-02
+tags: [webpack, modules, find, findByProps, findByCode, Discord internals]
+---
+
+{/*
+ * This file is part of docs.plexcord.club.
+ * Copyright (c) 2026 Plexcord.
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ */}
+
+# Webpack Module Access
+
+Discord is a Webpack-bundled application. Plexcord exposes utilities to search and access those internal modules at runtime, which is how plugins access Discord's stores, utilities, and React components.
+
+---
+
+## Import Paths
+
+```typescript
+// Pre-imported common Discord modules (recommended)
+import { UserStore, MessageStore, ChannelStore } from "@webpack/common";
+
+// Raw Webpack search functions
+import { find, findByProps, findByCode } from "@webpack";
+```
+
+---
+
+## `@webpack/common`: Pre-resolved Exports
+
+Plexcord pre-resolves the most commonly used Discord modules. Always prefer these over manual `find` calls.
+
+### Stores
+
+```typescript
+import {
+    UserStore,       // Current user, user lookups
+    GuildStore,      // Guild/server data
+    ChannelStore,    // Channel data
+    MessageStore,    // Message data
+    MemberStore,     // Guild member data
+    PresenceStore,   // Online status
+    VoiceStateStore, // Voice state
+    ReadStateStore,  // Unread/mention counts
+} from "@webpack/common";
+```
+
+### React & UI
+
+```typescript
+import {
+    React,           // React itself
+    ReactDOM,        // ReactDOM
+    Text,            // Discord's Text component
+    Button,          // Discord's Button component
+    Tooltip,         // Discord's Tooltip component
+    Switch,          // Discord's Switch toggle
+    Select,          // Discord's Select dropdown
+    TextInput,       // Discord's TextInput component
+    Modal,           // Modal utilities
+} from "@webpack/common";
+```
+
+### Utilities
+
+```typescript
+import {
+    RestAPI,         // Discord's REST API client
+    FluxDispatcher,  // Dispatch Flux events
+    NavigationUtils, // Navigate to channels/guilds
+    i18n,            // Internationalization / translations
+    hljs,            // Syntax highlighting (highlight.js)
+} from "@webpack/common";
+```
+
+---
+
+## Manual Module Search
+
+Use these when `@webpack/common` doesn't have what you need.
+
+### `findByProps`
+
+Finds a module by the names of its exported properties.
+
+```typescript
+import { findByProps } from "@webpack";
+
+// Find a module that has both 'sendMessage' and 'editMessage' exports
+const MessageActions = findByProps("sendMessage", "editMessage");
+MessageActions.sendMessage(channelId, { content: "Hello!" });
+```
+
+### `findByCode`
+
+Finds a function by searching its source code as a string.
+
+```typescript
+import { findByCode } from "@webpack";
+
+// Find a function whose source contains this unique string
+const openProfile = findByCode("openUserProfileModal");
+openProfile({ userId: "123456789" });
+```
+
+### `find`
+
+The most flexible option: provide a filter function.
+
+```typescript
+import { find } from "@webpack";
+
+// Module must have a 'default' export that is a string containing "MessageEditor"
+const MessageEditor = find(m => m.default?.toString().includes("MessageEditor"));
+```
+
+---
+
+## `waitFor`
+
+Some modules aren't available immediately at plugin startup. `waitFor` delays execution until a module becomes available.
+
+### Import
+
+```typescript
+import { waitForStore, waitFor } from "@webpack";
+```
+
+### Usage
+
+```typescript
+import { waitFor } from "@webpack";
+
+// Wait for a specific module to be available
+waitFor(["sendMessage", "editMessage"], (mod) => {
+    // Called once the module is available
+    MessageActions = mod;
+});
+```
+
+<Callout type="warn">
+Avoid using `waitFor` in tight loops. For most use cases, direct imports from `@webpack/common` are resolved before plugin `start()` is called.
+</Callout>
+
+---
+
+## Common Store Methods
+
+### `UserStore`
+
+```typescript
+import { UserStore } from "@webpack/common";
+
+const me = UserStore.getCurrentUser();
+// { id: "123456789", username: "You", discriminator: "0" }
+
+const user = UserStore.getUser("987654321");
+```
+
+### `ChannelStore`
+
+```typescript
+import { ChannelStore } from "@webpack/common";
+
+const channel = ChannelStore.getChannel(channelId);
+// { id, guild_id, name, type, ... }
+```
+
+### `GuildStore`
+
+```typescript
+import { GuildStore } from "@webpack/common";
+
+const guild = GuildStore.getGuild(guildId);
+// { id, name, icon, members, ... }
+
+const allGuilds = GuildStore.getGuilds();
+// Record<string, Guild>
+```
+
+### `RestAPI`
+
+```typescript
+import { RestAPI } from "@webpack/common";
+
+// GET request to Discord API
+const response = await RestAPI.get({
+    url: `/channels/${channelId}/messages`,
+    query: { limit: 50 }
+});
+
+// POST request
+await RestAPI.post({
+    url: `/channels/${channelId}/messages`,
+    body: { content: "Hello from plugin!" }
+});
+```
+
+---
+
+## Inspecting Available Modules
+
+You can explore Discord's module system in DevTools:
+
+```javascript
+// In Discord DevTools console:
+
+// Find all modules with a specific property
+Object.values(Vencord.Webpack.wreq.c)
+    .filter(m => m.exports?.sendMessage)
+    .map(m => m.exports);
+
+// Check what a known export looks like
+console.log(Vencord.Webpack.Common.UserStore);
+```
+
+---
+
+## Safety Guidelines
+
+<Callout type="warn">
+Webpack module internals can change between Discord updates. Follow these guidelines:
+
+- Prefer `@webpack/common` imports, which Plexcord maintains
+- Use multiple property names in `findByProps` for uniqueness
+- Use very specific code strings in `findByCode` to avoid false matches
+- Test after major Discord updates
+</Callout>
+
+---
+
+## Full Example: Send a Silent Message
+
+```typescript
+import definePlugin from "@utils/types";
+import { findByProps } from "@webpack";
+import { ChannelStore } from "@webpack/common";
+
+let MessageActions: any;
+
+export default definePlugin({
+    name: "SilentSend",
+    description: "Demonstrates Webpack module access",
+    authors: [{ name: "You", id: 0n }],
+
+    start() {
+        // Grab the module that handles message sending
+        MessageActions = findByProps("sendMessage", "editMessage");
+    },
+
+    commands: [{
+        name: "silent",
+        description: "Send a message silently (suppresses notifications)",
+        options: [{
+            name: "message",
+            description: "The message to send",
+            type: 3, // STRING
+            required: true
+        }],
+        execute(opts) {
+            const content = opts.find(o => o.name === "message")?.value as string;
+            // Use the flags field to suppress notifications
+            MessageActions.sendMessage(
+                ChannelStore.getChannel(Vencord.SelectedChannelStore.getChannelId() ?? "")?.id,
+                { content, flags: 4096 }
+            );
+        }
+    }]
+});
+```
+
+---
+
+## Next Steps
+
+<Cards>
+  <Card title="Patches" href="/docs/advanced-features/patches">
+    Modify Discord's internal functions directly with the patch system.
+  </Card>
+  <Card title="Examples" href="/docs/examples">
+    See complete plugins that use Webpack modules in practice.
+  </Card>
+</Cards>

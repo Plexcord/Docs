@@ -1,0 +1,354 @@
+﻿---
+title: Buttons & UI Extensions
+description: Add buttons to Discord's chat bar, message popover, and header bar using Plexcord's UI extension APIs.
+published: 2026-03-02
+tags: [buttons, UI, chat-bar, message-popover, header-bar, toolbar]
+---
+
+{/*
+ * This file is part of docs.plexcord.club.
+ * Copyright (c) 2026 Plexcord.
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ */}
+
+# Buttons & UI Extensions
+
+Plexcord lets you add custom buttons to several locations in Discord's interface:
+
+- **Chat Bar**: The row of buttons next to the message input box
+- **Message Popover**: The toolbar that appears when hovering a message  
+- **Header Bar**: The icons in the top-right of a channel
+
+## Chat Bar Buttons
+
+Add a button next to the message input (alongside the emoji, GIF, and gift buttons).
+
+### Setup
+
+```typescript
+import { addChatBarButton, removeChatBarButton, ChatBarButton } from "@api/ChatButtons";
+import { Tooltip } from "@webpack/common";
+
+// Define the button component
+const MyChatButton: ChatBarButton = ({ isMainChat }) => {
+    // isMainChat is false in thread sidebars, search results, etc.
+    if (!isMainChat) return null;
+
+    return (
+        <Tooltip text="My Custom Action">
+            {({ onMouseEnter, onMouseLeave }) => (
+                <button
+                    onMouseEnter={onMouseEnter}
+                    onMouseLeave={onMouseLeave}
+                    onClick={() => {
+                        console.log("Chat bar button clicked!");
+                    }}
+                    style={{
+                        background: "none",
+                        border: "none",
+                        cursor: "pointer",
+                        padding: "0 4px",
+                        color: "var(--interactive-normal)"
+                    }}
+                >
+                    🎯
+                </button>
+            )}
+        </Tooltip>
+    );
+};
+
+export default definePlugin({
+    name: "ChatBarExample",
+    description: "Adds a button to the chat bar",
+    authors: [{ name: "You", id: 0n }],
+
+    start() {
+        addChatBarButton("my-chat-button", MyChatButton);
+    },
+
+    stop() {
+        removeChatBarButton("my-chat-button");
+    }
+});
+```
+
+### Using Discord's Button Styles
+
+For a consistent look that matches Discord's own chat bar buttons, use the `Button` component:
+
+```typescript
+import { Button, Tooltip } from "@webpack/common";
+import { SquarePen } from "lucide-react";
+
+const MyChatButton: ChatBarButton = ({ isMainChat }) => {
+    if (!isMainChat) return null;
+
+    return (
+        <Tooltip text="Format Text">
+            {(tooltipProps) => (
+                <Button
+                    {...tooltipProps}
+                    size={Button.Sizes.MIN}
+                    look={Button.Looks.BLANK}
+                    onClick={handleClick}
+                    style={{ padding: "0 6px" }}
+                >
+                    <SquarePen size={20} />
+                </Button>
+            )}
+        </Tooltip>
+    );
+};
+```
+
+### Accessing the Message Input
+
+To read or modify the message input content when your button is clicked:
+
+```typescript
+import { ComponentDispatch } from "@webpack/common";
+import { findByProps } from "@webpack";
+
+const MyChatButton: ChatBarButton = ({ isMainChat }) => {
+    if (!isMainChat) return null;
+
+    function onClick() {
+        // Get the draft content
+        const DraftStore = findByProps("getDraft");
+        // Channel ID can be accessed from the channel store
+        // ... implementation varies
+        console.log("Text input accessed");
+    }
+
+    return (
+        <button onClick={onClick}>📝</button>
+    );
+};
+```
+
+## Message Popover Buttons
+
+Add buttons to the hover toolbar that appears on messages (the row with 👍, ✉️, ⋯).
+
+### Setup
+
+```typescript
+import { addMessagePopoverButton, removeMessagePopoverButton } from "@api/MessagePopover";
+
+export default definePlugin({
+    name: "MessagePopoverExample",
+    description: "Adds button to message hover toolbar",
+    authors: [{ name: "You", id: 0n }],
+
+    start() {
+        addMessagePopoverButton("my-popover-button", message => {
+            // Return null to hide button for specific messages
+            if (!message.content) return null;
+
+            return {
+                label: "Copy Text",
+                icon: () => <span>📋</span>,
+                message,
+                channel: { id: message.channel_id },
+                onClick() {
+                    navigator.clipboard.writeText(message.content);
+                }
+            };
+        });
+    },
+
+    stop() {
+        removeMessagePopoverButton("my-popover-button");
+    }
+});
+```
+
+## Header Bar Buttons
+
+Add icon buttons to the top-right area of a channel (alongside the search, inbox, and members list buttons).
+
+### Setup
+
+```typescript
+import { addServerListElement, removeServerListElement, ServerListRenderPosition } from "@api/ServerList";
+// Or for header bar specifically, use patches to inject into the toolbar component
+
+// For most use cases, header bar injection requires patching
+// the ChannelHeader component:
+
+import { addDecoration } from "@api/MessageDecorations";
+
+// Example: Channel header button via patch
+patches: [
+    {
+        find: "toolbar:function",
+        replacement: {
+            match: /(?<=toolbar:function.{0,100})\[/,
+            replace: "[Vencord.Plugins.plugins.MyPlugin.renderHeaderButton(), "
+        }
+    }
+],
+
+renderHeaderButton() {
+    return (
+        <Tooltip key="my-header-btn" text="My Feature">
+            {(props) => (
+                <button {...props} onClick={() => this.toggleMyFeature()}>
+                    🔧
+                </button>
+            )}
+        </Tooltip>
+    );
+}
+```
+
+<Callout type="info">
+  Header bar injection typically requires patches since there's no dedicated API. Use the **chat bar** when possible; it has a clean API.
+</Callout>
+
+## Server List Icons
+
+Add icons to Discord's left server list:
+
+```typescript
+import {
+    addServerListElement,
+    removeServerListElement,
+    ServerListRenderPosition
+} from "@api/ServerList";
+
+function MyServerListIcon() {
+    return (
+        <Tooltip text="My Plugin">
+            {(props) => (
+                <div
+                    {...props}
+                    onClick={() => doSomething()}
+                    style={{
+                        width: "48px",
+                        height: "48px",
+                        borderRadius: "50%",
+                        background: "var(--brand-experiment)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        cursor: "pointer",
+                        fontSize: "20px"
+                    }}
+                >
+                    🎯
+                </div>
+            )}
+        </Tooltip>
+    );
+}
+
+export default definePlugin({
+    name: "ServerListExample",
+    description: "Adds icon to server list",
+    authors: [{ name: "You", id: 0n }],
+
+    start() {
+        addServerListElement(
+            ServerListRenderPosition.Above,  // Above or Below server icons
+            MyServerListIcon
+        );
+    },
+
+    stop() {
+        removeServerListElement(
+            ServerListRenderPosition.Above,
+            MyServerListIcon
+        );
+    }
+});
+```
+
+## Complete Example: Word Count Button
+
+Adds a chat bar button that shows word count of what you've typed:
+
+```typescript
+import definePlugin from "@utils/types";
+import { addChatBarButton, removeChatBarButton, ChatBarButton } from "@api/ChatButtons";
+import { Tooltip } from "@webpack/common";
+import { DraftStore, SelectedChannelStore } from "@webpack/common";
+
+const WordCountButton: ChatBarButton = ({ isMainChat }) => {
+    if (!isMainChat) return null;
+
+    const [count, setCount] = React.useState(0);
+
+    React.useEffect(() => {
+        const update = () => {
+            const channelId = SelectedChannelStore.getChannelId();
+            const draft = DraftStore.getDraft(channelId, 0) ?? "";
+            const words = draft.trim().split(/\s+/).filter(Boolean).length;
+            setCount(words);
+        };
+
+        const interval = setInterval(update, 500);
+        return () => clearInterval(interval);
+    }, []);
+
+    if (count === 0) return null;
+
+    return (
+        <Tooltip text={`${count} word${count !== 1 ? "s" : ""}`}>
+            {({ onMouseEnter, onMouseLeave }) => (
+                <span
+                    onMouseEnter={onMouseEnter}
+                    onMouseLeave={onMouseLeave}
+                    style={{
+                        color: "var(--text-muted)",
+                        fontSize: "12px",
+                        padding: "0 6px",
+                        alignSelf: "center"
+                    }}
+                >
+                    {count}w
+                </span>
+            )}
+        </Tooltip>
+    );
+};
+
+export default definePlugin({
+    name: "WordCount",
+    description: "Shows word count in chat bar while typing",
+    authors: [{ name: "You", id: 0n }],
+
+    start() {
+        addChatBarButton("word-count", WordCountButton);
+    },
+
+    stop() {
+        removeChatBarButton("word-count");
+    }
+});
+```
+
+## Next Steps
+
+<Cards>
+  <Card title="API Reference" href="/docs/api-reference">
+    Complete API documentation for all Plexcord APIs.
+  </Card>
+  <Card title="Examples" href="/docs/examples">
+    Full working plugin examples from beginner to advanced.
+  </Card>
+</Cards>

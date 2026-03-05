@@ -1,0 +1,346 @@
+﻿---
+title: Settings Deep Dive
+description: Master every Plexcord OptionType in detail. Learn BOOLEAN, STRING, NUMBER, SELECT, SLIDER, MULTISELECT, BIGINT, and COMPONENT with real examples.
+published: 2026-03-02
+tags: [settings, OptionType, definePluginSettings, configuration]
+---
+
+{/*
+ * This file is part of docs.plexcord.club.
+ * Copyright (c) 2026 Plexcord.
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ */}
+
+# Settings Deep Dive
+
+The Getting Started guide covered the basics. This guide covers every available `OptionType`, advanced patterns, and how the settings system works internally.
+
+## How Settings Work Internally
+
+When you call `definePluginSettings()`, Plexcord:
+
+1. Creates a reactive store backed by `localStorage`
+2. Generates a settings panel UI automatically
+3. Makes values available via `settings.store`
+4. Persists changes across Discord restarts
+
+```typescript
+import { definePluginSettings } from "@api/Settings";
+import { OptionType } from "@utils/types";
+
+const settings = definePluginSettings({
+    myOption: {
+        type: OptionType.BOOLEAN,
+        description: "My setting",
+        default: true
+    }
+});
+
+// Read:  settings.store.myOption  → boolean
+// Write: settings.store.myOption = false  (triggers save + re-render)
+```
+
+## All Option Types
+
+### `OptionType.BOOLEAN`
+
+Renders as a toggle switch. The simplest and most common type.
+
+```typescript
+enabled: {
+    type: OptionType.BOOLEAN,
+    description: "Enable this feature",
+    default: true,
+    restartNeeded: false,   // Shows "Restart required" message if true
+    onChange(value: boolean) {
+        console.log("Toggled:", value);
+    }
+},
+```
+
+**Options:**
+
+| Property | Type | Required | Description |
+|----------|------|----------|-------------|
+| `type` | `OptionType.BOOLEAN` | ✅ | |
+| `description` | `string` | ✅ | Label in settings UI |
+| `default` | `boolean` | ✅ | Initial value |
+| `restartNeeded` | `boolean` | | Show restart warning |
+| `hidden` | `boolean \| () => boolean` | | Hide from settings UI |
+| `onChange` | `(value) => void` | | Called on change |
+
+---
+
+### `OptionType.STRING`
+
+A text input field.
+
+```typescript
+greeting: {
+    type: OptionType.STRING,
+    description: "Custom greeting message",
+    default: "Hello!",
+    placeholder: "Enter a message...",
+    isValid: (value: string) => {
+        if (value.length > 100) return "Max 100 characters";
+        return true;
+    }
+},
+```
+
+**Options:**
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `default` | `string` | Initial text value |
+| `placeholder` | `string` | Gray hint text when empty |
+| `isValid` | `(v: string) => boolean \| string` | Validation: return `true` or error message |
+
+---
+
+### `OptionType.NUMBER`
+
+A numeric input field.
+
+```typescript
+delay: {
+    type: OptionType.NUMBER,
+    description: "Delay in milliseconds",
+    default: 1000,
+    isValid: (value: number) => {
+        if (value < 0) return "Must be positive";
+        if (value > 60000) return "Max 60 seconds";
+        return true;
+    }
+},
+```
+
+---
+
+### `OptionType.BIGINT`
+
+Like NUMBER but for JavaScript BigInt values. Useful for Discord user/guild IDs.
+
+```typescript
+targetUserId: {
+    type: OptionType.BIGINT,
+    description: "Target user's Discord ID",
+    default: 0n,    // BigInt literal
+    isValid: (value: bigint) => {
+        if (value <= 0n) return "Enter a valid Discord ID";
+        return true;
+    }
+},
+```
+
+---
+
+### `OptionType.SELECT`
+
+A dropdown with defined options.
+
+```typescript
+logLevel: {
+    type: OptionType.SELECT,
+    description: "Logging verbosity",
+    default: "warn",
+    options: [
+        { label: "Errors only", value: "error" },
+        { label: "Warnings", value: "warn", default: true },
+        { label: "All messages", value: "info" },
+        { label: "Verbose debug", value: "debug" }
+    ]
+},
+```
+
+<Callout type="info">
+  The `default: true` on an option marks the pre-selected option in the UI. The setting's `default` value should match the selected option's `value`.
+</Callout>
+
+---
+
+### `OptionType.MULTISELECT`
+
+A multi-selection list. The value is an array.
+
+```typescript
+features: {
+    type: OptionType.MULTISELECT,
+    description: "Enable specific features",
+    default: ["timestamps", "reactions"],
+    options: [
+        { label: "Message Timestamps", value: "timestamps", default: true },
+        { label: "Reaction Count", value: "reactions", default: true },
+        { label: "User Badges", value: "badges" },
+        { label: "Read Receipts", value: "receipts" }
+    ]
+},
+```
+
+Reading the value:
+
+```typescript
+start() {
+    const enabled = settings.store.features;  // string[]
+    if (enabled.includes("timestamps")) {
+        // Show timestamps feature
+    }
+},
+```
+
+---
+
+### `OptionType.SLIDER`
+
+A visual range slider.
+
+```typescript
+opacity: {
+    type: OptionType.SLIDER,
+    description: "Overlay opacity percentage",
+    default: 80,
+    markers: [0, 20, 40, 60, 80, 100],
+    stickToMarkers: true,   // Snaps to marker values
+    // stickToMarkers: false  → allows any value in range
+},
+```
+
+---
+
+### `OptionType.COMPONENT`
+
+Renders a custom React component inside the settings panel. Used for buttons, info boxes, or any custom UI.
+
+```typescript
+import { Button } from "@webpack/common";
+
+debugInfo: {
+    type: OptionType.COMPONENT,
+    description: "Plugin debug tools",
+    component: () => {
+        const [count, setCount] = React.useState(0);
+        return (
+            <div style={{ display: "flex", gap: "8px" }}>
+                <Button onClick={() => {
+                    clearMyCache();
+                    setCount(c => c + 1);
+                }}>
+                    Clear Cache ({count} times)
+                </Button>
+                <Button
+                    color={Button.Colors.RED}
+                    onClick={() => resetAllSettings()}
+                >
+                    Reset Defaults
+                </Button>
+            </div>
+        );
+    }
+},
+```
+
+---
+
+## Advanced Patterns
+
+### Conditional Visibility
+
+Hide settings based on other settings values:
+
+```typescript
+const settings = definePluginSettings({
+    useCustomUrl: {
+        type: OptionType.BOOLEAN,
+        description: "Use a custom API endpoint",
+        default: false
+    },
+    customUrl: {
+        type: OptionType.STRING,
+        description: "Custom API URL",
+        default: "https://api.example.com",
+        hidden: () => !settings.store.useCustomUrl
+    }
+});
+```
+
+### `restartNeeded`
+
+Show a restart warning when a setting is changed. Use this for settings that take effect only at startup.
+
+```typescript
+patchMode: {
+    type: OptionType.SELECT,
+    description: "How patches are applied",
+    default: "auto",
+    options: [
+        { label: "Automatic (recommended)", value: "auto", default: true },
+        { label: "Manual", value: "manual" }
+    ],
+    restartNeeded: true   // Discord restart required to apply
+},
+```
+
+### Accessing Settings Outside the Plugin
+
+Other plugins or utilities can read your settings via the Plexcord settings API:
+
+```typescript
+import { Settings } from "@api/Settings";
+
+// Read another plugin's setting
+const enabled = Settings.plugins.MyPlugin.someOption;
+```
+
+<Callout type="warning">
+  Avoid reading or writing other plugins' settings unless you explicitly declare a `dependency` on them. This creates tight coupling.
+</Callout>
+
+## Type Safety
+
+`definePluginSettings` is fully typed. TypeScript will infer the correct type for each setting:
+
+```typescript
+const settings = definePluginSettings({
+    count: { type: OptionType.NUMBER, description: "...", default: 0 },
+    name: { type: OptionType.STRING, description: "...", default: "" },
+    enabled: { type: OptionType.BOOLEAN, description: "...", default: true },
+    mode: {
+        type: OptionType.SELECT,
+        description: "...",
+        default: "a",
+        options: [
+            { label: "A", value: "a" as const },
+            { label: "B", value: "b" as const }
+        ]
+    }
+});
+
+settings.store.count;    // number
+settings.store.name;     // string
+settings.store.enabled;  // boolean
+settings.store.mode;     // "a" | "b"
+```
+
+## Next Steps
+
+<Cards>
+  <Card title="Platform-Specific Plugins" href="/docs/core-concepts/platform-specific">
+    Write plugins that target specific Discord platforms.
+  </Card>
+  <Card title="Debugging" href="/docs/core-concepts/debugging">
+    Debug settings-related issues and use DevTools.
+  </Card>
+</Cards>

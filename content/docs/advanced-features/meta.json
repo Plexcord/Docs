@@ -1,0 +1,13 @@
+{
+  "title": "Advanced Features",
+  "icon": "Zap",
+  "pages": [
+    "index",
+    "patches",
+    "commands",
+    "flux-events",
+    "context-menus",
+    "message-decorations",
+    "buttons-ui"
+  ]
+}

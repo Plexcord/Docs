@@ -1,0 +1,142 @@
+﻿---
+title: Introduction
+description: What is Plexcord, why develop for it, and what can you build? Start here.
+icon: House
+---
+
+{/*
+ * This file is part of docs.plexcord.club.
+ * Copyright (c) 2026 Plexcord.
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ */}
+
+import { Rocket, BookOpen, Zap, Book, Code, CircleCheck, FileText, Wrench, Globe, Users } from 'lucide-react';
+
+# Welcome to Plexcord Plugin Development
+
+Plexcord is a powerful, open-source Discord client modification built for extensibility. At its core is a rich plugin API that gives developers full control over Discord's UI and behavior from small quality-of-life tweaks to deeply integrated features.
+
+This documentation covers everything you need to build plugins: concepts, APIs, examples, and best practices.
+
+## What is Plexcord?
+
+Plexcord sits between the Discord client and you, intercepting and augmenting Discord's JavaScript bundle at runtime. This means:
+
+- **No API rate limits or permissions**
+- **Access to Discord's internal modules**
+- **Full TypeScript support**
+
+Plexcord ships with dozens of built-in plugins and an active community of contributors. Your plugin could be next.
+
+## Why Develop for Plexcord?
+
+### <Rocket className="inline mr-2" size={20} /> Powerful Plugin API
+
+Add context menus, slash commands, message action buttons, message accessories, and much more with a clean, well-documented API. The plugin system handles loading, settings, and lifecycle management for you.
+
+### <FileText className="inline mr-2" size={20} /> TypeScript, JSX, CSS, Fully Modular
+
+Plugins support TypeScript, JSX syntax, CSS imports, and multi-file code organization. Plexcord's internal modules and many Discord modules are fully typed, giving you real IDE support as you write.
+
+### <Wrench className="inline mr-2" size={20} /> RegExp Code Patches
+
+Instead of fragile monkey-patches, Plexcord lets you rewrite Discord's source code in-place with RegExp replacements. Target specific functions, inject code, or swap behavior with surgical precision.
+
+### <Zap className="inline mr-2" size={20} /> Native Capabilities
+
+Need filesystem access, custom IPC, or Node.js APIs? Plugins can define native functions that run in the main process with full system access, without compromising the renderer's security model.
+
+### <Globe className="inline mr-2" size={20} /> Built-in Internationalization
+
+Discord is a global platform with users across 30+ language regions. A plugin that only speaks English is inaccessible to millions of users. Plexcord's i18n system exists specifically so that any plugin, even one written by a solo developer, works correctly for every user regardless of their language setting.
+
+Plexcord has a first-class, fully typed i18n system. Your plugin's UI strings (labels, notifications, settings descriptions) are automatically displayed in the user's language. Add strings to the shared locale files and `t()` handles the rest. Plexcord supports all Discord languages including English, Turkish, German, French, Japanese, Korean, Chinese (Simplified & Traditional), Russian, Spanish, Portuguese, and 20+ more.
+
+### <Users className="inline mr-2" size={20} /> Active Ecosystem
+
+Plexcord has a large, active user base. Plugins you contribute are immediately available to thousands of users. The codebase is open, the maintainers are responsive, and the community is welcoming to new contributors.
+
+## What Can You Build?
+
+### User Interface Enhancements
+- Custom buttons and menus
+- Message decorations and badges
+- Profile customizations
+- UI components and overlays
+
+### Automation & Tools
+- Slash commands
+- Auto-responders
+- Message scheduling
+- Workflow automation
+
+### Moderation & Administration
+- Advanced moderation tools
+- Logging and analytics
+- User management
+- Anti-spam systems
+
+### Fun & Creative
+- Games and entertainment
+- Custom emojis and stickers
+- Easter eggs
+- Voice effects
+
+## Explore the Docs
+
+<Cards>
+  <Card title="Getting Started" href="/docs/getting-started" icon={<Rocket />}>
+    Set up your environment and build your first plugin
+  </Card>
+  <Card title="Core Concepts" href="/docs/core-concepts" icon={<BookOpen />}>
+    Plugin lifecycle, metadata, settings, and debugging
+  </Card>
+  <Card title="Advanced Features" href="/docs/advanced-features" icon={<Zap />}>
+    Patches, commands, Flux events, context menus
+  </Card>
+  <Card title="API Reference" href="/docs/api-reference" icon={<Book />}>
+    Complete API documentation with TypeScript interfaces
+  </Card>
+  <Card title="Examples" href="/docs/examples" icon={<Code />}>
+    Real-world plugin examples from simple to advanced
+  </Card>
+  <Card title="Best Practices" href="/docs/best-practices" icon={<CircleCheck />}>
+    Write production-quality plugins with our guidelines
+  </Card>
+</Cards>
+
+## Developer Resources
+
+<Cards>
+  <Card 
+    title="GitHub Repository" 
+    href="https://github.com/MutanPlex/Plexcord"
+    external
+  >
+    Source code, issues, and pull requests
+  </Card>
+  <Card 
+    title="Report Issues" 
+    href="https://github.com/MutanPlex/Plexcord/issues"
+    external
+  >
+    Bug reports and feature requests
+  </Card>
+</Cards>
+
+---
+
+Ready to write code? Head to [Getting Started](/docs/getting-started) to set up your environment and build your first plugin in under 30 minutes.

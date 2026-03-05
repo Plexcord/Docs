@@ -1,0 +1,367 @@
+﻿---
+title: Flux Events
+description: Subscribe to Discord's Flux event system in Plexcord plugins. Learn MESSAGE_CREATE, PRESENCE_UPDATE, CHANNEL_SELECT, and all available events.
+published: 2026-03-02
+tags: [flux, events, MESSAGE_CREATE, PRESENCE_UPDATE, real-time]
+---
+
+{/*
+ * This file is part of docs.plexcord.club.
+ * Copyright (c) 2026 Plexcord.
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ */}
+
+# Flux Events
+
+Discord uses a [Flux](https://facebook.github.io/flux/) architecture internally. Every action in Discord dispatches a Flux event. Plexcord lets your plugin subscribe to these events via the `flux` property.
+
+## Basic Usage
+
+```typescript
+import definePlugin from "@utils/types";
+
+export default definePlugin({
+    name: "MessageWatcher",
+    description: "Watches for new messages",
+    authors: [{ name: "You", id: 0n }],
+
+    flux: {
+        MESSAGE_CREATE({ message, channelId }) {
+            console.log(`New message in ${channelId}:`, message.content);
+        }
+    }
+});
+```
+
+Flux handlers are automatically registered when your plugin starts and removed when it stops. No manual cleanup needed.
+
+## How Flux Works
+
+```
+User types a message → "Send" clicked
+        │
+        ▼
+FluxDispatcher.dispatch({
+    type: "MESSAGE_CREATE",
+    message: { content: "hello", id: "...", author: {...} },
+    channelId: "123456"
+})
+        │
+        ▼
+All registered listeners for "MESSAGE_CREATE" are called
+including your plugin's handler
+```
+
+## Common Events
+
+### Message Events
+
+```typescript
+flux: {
+    // A new message was sent
+    MESSAGE_CREATE({ message, channelId, guildId }) {
+        message.id        // Snowflake ID
+        message.content   // Text content
+        message.author    // User object
+        message.attachments  // Files
+        message.embeds    // Embed objects
+        channelId         // Channel where message was sent
+        guildId           // Server ID (undefined in DMs)
+    },
+
+    // A message was edited
+    MESSAGE_UPDATE({ message, channelId }) {
+        message.content   // New content
+        message.editedTimestamp  // When it was edited
+    },
+
+    // A message was deleted
+    MESSAGE_DELETE({ id, channelId }) {
+        id         // Deleted message's ID
+        channelId  // Channel it was in
+    },
+
+    // Multiple messages deleted at once
+    MESSAGE_DELETE_BULK({ ids, channelId }) {
+        ids  // Array of deleted message IDs
+    }
+}
+```
+
+### Reaction Events
+
+```typescript
+flux: {
+    MESSAGE_REACTION_ADD({ userId, channelId, messageId, emoji }) {
+        emoji.name   // "👍" or custom emoji name
+        emoji.id     // null for unicode, snowflake for custom
+    },
+
+    MESSAGE_REACTION_REMOVE({ userId, channelId, messageId, emoji }) {
+        // Same as ADD
+    }
+}
+```
+
+### User & Presence Events
+
+```typescript
+flux: {
+    // User came online / changed status
+    PRESENCE_UPDATE({ user, status, activities }) {
+        user.id       // User snowflake
+        status        // "online" | "idle" | "dnd" | "offline"
+        activities    // Array of activities (gaming, listening, etc.)
+    },
+
+    // Your own user object updated
+    USER_UPDATE(user) {
+        user.username
+        user.avatar
+    }
+}
+```
+
+### Channel Events
+
+```typescript
+flux: {
+    // User switched to a different channel
+    CHANNEL_SELECT({ channelId, guildId }) {
+        channelId  // New channel (null if closed/home)
+        guildId    // Server ID
+    },
+
+    // Channel was created
+    CHANNEL_CREATE({ channel }) {
+        channel.id
+        channel.name
+        channel.type
+    },
+
+    // Channel was deleted
+    CHANNEL_DELETE({ channel }) { ... },
+
+    // Someone started typing
+    TYPING_START({ channelId, userId, timestamp }) {
+        userId     // Who is typing
+        channelId  // Where
+    }
+}
+```
+
+### Voice Events
+
+```typescript
+flux: {
+    // Someone joined/left/moved voice
+    VOICE_STATE_UPDATE({ userId, channelId, guildId, oldChannelId }) {
+        channelId     // New channel (null = left voice)
+        oldChannelId  // Previous channel
+        userId        // Who moved
+    },
+
+    // Voice connection status changed
+    VOICE_CONNECTION_STATUS({ status, context }) {
+        status  // "CONNECTING" | "CONNECTED" | "DISCONNECTED" | etc.
+    }
+}
+```
+
+### Guild Events
+
+```typescript
+flux: {
+    // You joined a new server
+    GUILD_CREATE({ guild }) {
+        guild.id
+        guild.name
+        guild.memberCount
+    },
+
+    // A member joined the server
+    GUILD_MEMBER_ADD({ guildId, user }) {
+        user.id
+        user.username
+    },
+
+    // A member left/was kicked
+    GUILD_MEMBER_REMOVE({ guildId, user }) { ... },
+
+    // A member's roles/nickname changed
+    GUILD_MEMBER_UPDATE({ guildId, user, roles, nick }) { ... }
+}
+```
+
+### Call Events
+
+```typescript
+flux: {
+    // DM/group call started
+    CALL_CREATE({ call }) { ... },
+
+    // Call ended
+    CALL_DELETE({ channelId }) { ... }
+}
+```
+
+## Multiple Handlers
+
+Handle multiple events in one plugin:
+
+```typescript
+flux: {
+    MESSAGE_CREATE({ message }) {
+        this.onMessage(message, "created");
+    },
+    MESSAGE_UPDATE({ message }) {
+        this.onMessage(message, "updated");
+    },
+    MESSAGE_DELETE({ id }) {
+        this.log(`Message ${id} deleted`);
+    }
+},
+
+// These methods are on the plugin object, accessible via `this`
+onMessage(message: any, action: string) {
+    console.log(`[${action.toUpperCase()}]`, message.content);
+},
+log(text: string) {
+    console.log("[MessageTracker]", text);
+}
+```
+
+## Filtering Events
+
+Always filter to avoid unnecessary work:
+
+```typescript
+flux: {
+    MESSAGE_CREATE({ message, guildId }) {
+        // Only process in specific server
+        if (guildId !== "MY_SERVER_ID") return;
+
+        // Ignore bots
+        if (message.author.bot) return;
+
+        // Ignore messages without content
+        if (!message.content.trim()) return;
+
+        // Process matching messages
+        this.processMessage(message);
+    }
+}
+```
+
+## Complete Example: Online Notifier
+
+Notifies you when a specific user comes online:
+
+```typescript
+import definePlugin, { OptionType } from "@utils/types";
+import { definePluginSettings } from "@api/Settings";
+import { showNotification } from "@api/Notifications";
+
+const settings = definePluginSettings({
+    watchedUserId: {
+        type: OptionType.STRING,
+        description: "Discord user ID to watch",
+        default: "",
+        placeholder: "Enter a Discord user ID"
+    }
+});
+
+export default definePlugin({
+    name: "OnlineNotifier",
+    description: "Notifies when a user comes online",
+    authors: [{ name: "You", id: 0n }],
+    settings,
+
+    flux: {
+        PRESENCE_UPDATE({ user, status }) {
+            const watchedId = settings.store.watchedUserId;
+            if (!watchedId) return;
+
+            if (user.id === watchedId && status === "online") {
+                showNotification({
+                    title: "User Online",
+                    body: `${user.username} is now online!`,
+                    color: "#43B581"
+                });
+            }
+        }
+    }
+});
+```
+
+## Getting Flux Dispatcher Directly
+
+For advanced use cases, access the Flux Dispatcher directly:
+
+```typescript
+import { FluxDispatcher } from "@webpack/common";
+
+export default definePlugin({
+    name: "DirectFlux",
+    description: "...",
+    authors: [{ name: "You", id: 0n }],
+
+    start() {
+        // Manual subscription (not recommended: use flux: {} instead)
+        FluxDispatcher.subscribe("MESSAGE_CREATE", this.handler);
+    },
+
+    stop() {
+        FluxDispatcher.unsubscribe("MESSAGE_CREATE", this.handler);
+    },
+
+    handler({ message }: any) {
+        console.log(message);
+    }
+});
+```
+
+<Callout type="info">
+  **Prefer the `flux: {}` property** over manual `subscribe/unsubscribe`. Plexcord handles cleanup automatically.
+</Callout>
+
+## Event Reference (Partial)
+
+| Event | Trigger |
+|-------|---------|
+| `MESSAGE_CREATE` | New message sent |
+| `MESSAGE_UPDATE` | Message edited |
+| `MESSAGE_DELETE` | Message deleted |
+| `MESSAGE_REACTION_ADD` | Reaction added |
+| `PRESENCE_UPDATE` | User status changed |
+| `CHANNEL_SELECT` | User navigated to channel |
+| `TYPING_START` | User started typing |
+| `VOICE_STATE_UPDATE` | Voice channel change |
+| `GUILD_CREATE` | Joined a server |
+| `GUILD_MEMBER_ADD` | Member joined server |
+| `USER_UPDATE` | Profile updated |
+| `CALL_CREATE` | DM call started |
+
+## Next Steps
+
+<Cards>
+  <Card title="Context Menus" href="/docs/advanced-features/context-menus">
+    Add items to Discord's right-click menus.
+  </Card>
+  <Card title="Message Decorations" href="/docs/advanced-features/message-decorations">
+    Overlay UI elements on messages.
+  </Card>
+</Cards>

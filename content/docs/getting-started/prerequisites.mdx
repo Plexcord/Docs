@@ -1,0 +1,200 @@
+﻿---
+title: Prerequisites
+description: Set up your development environment to start building Plexcord plugins. Install Node.js, pnpm, VS Code, and clone the Plexcord repository.
+published: 2026-03-02
+tags: [setup, environment, nodejs, pnpm, vscode]
+---
+
+{/*
+ * This file is part of docs.plexcord.club.
+ * Copyright (c) 2026 Plexcord.
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ */}
+
+# Prerequisites
+
+Before you write your first plugin, you need a working development environment. This guide walks you through everything you need.
+
+## Required Software
+
+### 1. Node.js (v22 or higher)
+
+Plexcord requires **Node.js 22 or higher** for its build tooling.
+
+```bash
+# Check your current version
+node --version
+# Should output: v22.x.x or higher
+```
+
+**Download:** https://nodejs.org/en/download
+
+<Callout type="info">
+  Use the **LTS** release for stability. Avoid odd-numbered versions (v23, v25) unless you need cutting-edge features.
+</Callout>
+
+### 2. pnpm Package Manager
+
+Plexcord uses **pnpm** (not npm or yarn) as its package manager.
+
+```bash
+# Install pnpm via npm
+npm install -g pnpm
+
+# Verify installation
+pnpm --version
+# Should output: 9.x.x or higher
+```
+
+### 3. Git
+
+You need Git to clone the Plexcord repository and track changes.
+
+```bash
+# Check if Git is installed
+git --version
+# Should output: git version 2.x.x
+```
+
+**Download:** https://git-scm.com/downloads
+
+### 4. Code Editor
+
+We strongly recommend **Visual Studio Code**. See the [Editor Setup](/docs/getting-started/editor-setup) guide for the full list of recommended extensions.
+
+## Clone the Plexcord Repository
+
+All plugins are written inside the Plexcord source code. Clone the official repository:
+
+```bash
+# Clone the repository
+git clone https://github.com/MutanPlex/Plexcord.git
+
+# Navigate into the folder
+cd Plexcord
+```
+
+## Install Dependencies
+
+```bash
+# Install all required packages
+pnpm install
+```
+
+This will take a minute or two on the first run. You should see output like:
+
+```
+Progress: resolved 800 packages
+Packages deduped, added, removed...
+Done in 45s
+```
+
+## Build Plexcord
+
+Build the project before injecting:
+
+```bash
+pnpm build
+```
+
+## Inject into Discord
+
+Once built, inject Plexcord into your Discord client. This patches Discord's `app.asar` so it loads Plexcord on startup:
+
+```bash
+pnpm inject
+```
+
+The script will detect your installed Discord client. Plexcord supports all three release channels:
+
+| Channel | Notes |
+|---------|-------|
+| **Stable** | Recommended for daily use |
+| **PTB** (Public Test Build) | More frequent updates |
+| **Canary** | Bleeding-edge, may be unstable |
+
+You only need to run `pnpm inject` once. Subsequent `pnpm build` runs will be picked up automatically on the next Discord restart.
+
+To remove Plexcord from Discord:
+
+```bash
+pnpm uninject
+```
+
+<Callout type="warning">
+  Use a **test Discord account** while developing. Some plugins can affect your account or get flagged if used incorrectly.
+</Callout>
+
+## Web Extension
+
+Plexcord also runs as a browser extension. Build it with:
+
+```bash
+pnpm buildWeb
+```
+
+Then load the generated `dist/` folder as an **unpacked extension** in Chrome or Edge:
+1. Open `chrome://extensions` (or `edge://extensions`)
+2. Enable **Developer mode**
+3. Click **Load unpacked** and select the `dist/` folder
+
+## Verify Your Setup
+
+Run a quick check to make sure everything compiles cleanly:
+
+```bash
+# Check TypeScript compiles correctly
+pnpm tsc --noEmit
+
+# Run the linter
+pnpm lint
+```
+
+If both commands exit without errors, your environment is ready.
+
+## Project Structure Overview
+
+Here's where plugins live inside the Plexcord repository:
+
+```
+Plexcord/
+├── src/
+│   ├── plugins/          ← Official plugins (contribute here)
+│   │   ├── helloWorld/
+│   │   │   └── index.ts
+│   │   └── ...
+│   ├── userplugins/      ← Your personal plugins (not committed)
+│   │   └── myPlugin/
+│   │       └── index.ts
+│   └── utils/
+│       └── types.ts      ← Plugin type definitions
+└── ...
+```
+
+**Where should I write my plugin?**
+
+- `src/userplugins/`: For personal plugins. Not tracked by git, perfect for experimenting.
+- `src/plugins/`: For contributing to the official Plexcord project.
+
+## Next Steps
+
+You're ready to write your first plugin!
+
+<Cards>
+  <Card title="Quick Start" href="/docs/getting-started/quick-start">
+    Create your first plugin in under 5 minutes.
+  </Card>
+</Cards>

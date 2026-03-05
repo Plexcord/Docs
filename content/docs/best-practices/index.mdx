@@ -1,0 +1,153 @@
+﻿---
+title: Best Practices
+description: Write production-quality Plexcord plugins. Code quality, performance, security, and maintenance guidelines.
+published: 2026-03-02
+tags: [best-practices, code-quality, performance, security, guidelines]
+---
+
+{/*
+ * This file is part of docs.plexcord.club.
+ * Copyright (c) 2026 Plexcord.
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ */}
+
+# Best Practices
+
+This section covers the patterns and practices followed by high-quality Plexcord plugins. Read these before submitting a plugin to the official repository.
+
+## What's Covered
+
+<Cards>
+  <Card title="Code Quality" href="/docs/best-practices/code-quality">
+    TypeScript patterns, naming conventions, and code organization guidelines.
+  </Card>
+  <Card title="Performance" href="/docs/best-practices/performance">
+    Avoid unnecessary re-renders, debounce heavy operations, and keep plugins lightweight.
+  </Card>
+  <Card title="Security" href="/docs/best-practices/security">
+    Prevent XSS, validate inputs, and handle user data responsibly.
+  </Card>
+</Cards>
+
+## Quick Checklist
+
+Before releasing or submitting a plugin:
+
+- [ ] `stop()` cleans up all resources from `start()`
+- [ ] No `console.log`: use `Logger` instead
+- [ ] No hardcoded user IDs or server IDs
+- [ ] Settings have sensible defaults
+- [ ] TypeScript compiles without `any` casts (if avoidable)
+- [ ] User inputs are validated before use
+- [ ] No network requests to external services without user consent
+- [ ] Flux handlers check relevance before heavy processing
+- [ ] Description accurately describes what the plugin does
+
+## The Golden Rules
+
+1. **Always clean up in `stop()`**: Remove every listener, interval, and DOM change
+2. **Use the Logger**: Don't pollute the console with raw `console.log` calls
+3. **Respect user settings**: Check your settings before doing anything
+4. **Fail gracefully**: Use try/catch around fragile code (patches, Webpack lookups)
+5. **Keep it focused**: One plugin, one purpose
+
+
+# Frequently Asked Questions
+
+Find answers to common questions about Plexcord.
+
+## General
+
+### What is Plexcord?
+
+Plexcord is an open-source Discord modification that enhances your Discord experience with additional features and customization options.
+
+### Is Plexcord safe to use?
+
+Yes, Plexcord is completely open-source and regularly audited by the community. You can review all code on [GitHub](https://github.com/MutanPlex/Plexcord).
+
+### Is Plexcord free?
+
+Yes, Plexcord is completely free and open-source under the MIT license.
+
+## Installation & Setup
+
+### Which Discord versions are supported?
+
+Plexcord supports Discord Stable and PTB (Public Test Build) on Windows, macOS, and Linux.
+
+### Do I need to reinstall Plexcord after Discord updates?
+
+Usually no, but major Discord updates may require reinstallation. Check the [Installation Guide](/docs/getting-started/installation) for details.
+
+### Can I use Plexcord with BetterDiscord?
+
+While technically possible, it's not recommended as conflicts may occur. Choose one modification at a time.
+
+## Features & Configuration
+
+### How do I enable/disable specific features?
+
+Go to Discord Settings → Plexcord → Features and toggle the features you want.
+
+### Can I create custom themes?
+
+Yes! Check out the [Theme Customization](/docs/examples/theme-customization) guide.
+
+### How do I create plugins?
+
+See the [Plugin Development](/docs/examples/plugin-development) guide for a complete walkthrough.
+
+## Troubleshooting
+
+### Plexcord isn't loading after installation
+
+1. Make sure Discord is completely closed
+2. Restart Discord
+3. Check if Plexcord files are in the correct directory
+4. See the [Troubleshooting](/docs/getting-started/installation#troubleshooting) section
+
+### Discord crashes after installing Plexcord
+
+This is usually due to conflicting modifications or corrupted installation:
+
+1. Completely uninstall Plexcord
+2. Reinstall Discord
+3. Install Plexcord again using the [Installation Guide](/docs/getting-started/installation)
+
+### Features are missing or not working
+
+1. Verify you have the latest Plexcord version
+2. Check if the features are enabled in settings
+3. Look for error messages in the console (Ctrl+Shift+I)
+
+## Contributing
+
+### How can I contribute to Plexcord?
+
+Check out the [GitHub repository](https://github.com/MutanPlex/Plexcord) for contribution guidelines.
+
+### I found a bug, where do I report it?
+
+Please report bugs on [GitHub Issues](https://github.com/MutanPlex/Plexcord/issues).
+
+### Can I translate the documentation?
+
+Yes! Documentation translations are welcome. Contact the maintainers on GitHub.
+
+## Still have questions?
+
+Join our Discord community or open an issue on [GitHub](https://github.com/MutanPlex/Plexcord/issues).

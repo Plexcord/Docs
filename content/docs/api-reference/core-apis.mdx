@@ -1,0 +1,275 @@
+﻿---
+title: Core APIs
+description: TypeScript reference for definePlugin, definePluginSettings, OptionType, and StartAt, the core building blocks of every Plexcord plugin.
+published: 2026-03-02
+tags: [definePlugin, definePluginSettings, OptionType, StartAt, core]
+---
+
+{/*
+ * This file is part of docs.plexcord.club.
+ * Copyright (c) 2026 Plexcord.
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ */}
+
+# Core APIs
+
+The foundational APIs every Plexcord plugin uses.
+
+## `definePlugin`
+
+**Import:** `import definePlugin from "@utils/types"`
+
+Creates and registers a Plexcord plugin. Takes a `PluginDef` object and returns a typed plugin.
+
+### Signature
+
+```typescript
+function definePlugin<T extends PluginDef>(p: T): T
+```
+
+### Parameters
+
+```typescript
+interface PluginDef {
+    // ── Required ──────────────────────────────────────
+    name: string;
+    description: string;
+    authors: PluginAuthor[];
+
+    // ── Lifecycle ─────────────────────────────────────
+    start?(): void;
+    stop?(): void;
+    startAt?: StartAt;
+
+    // ── Features ──────────────────────────────────────
+    patches?: Patch | Patch[];
+    commands?: Command[];
+    flux?: FluxEvents;
+    settings?: DefinedSettings;
+
+    // ── Metadata ──────────────────────────────────────
+    dependencies?: string[];
+    required?: boolean;
+    enabledByDefault?: boolean;
+    tags?: string[];
+    settingsAboutComponent?(): ReactElement;
+
+    // ── Any additional properties are allowed ─────────
+    [key: string]: any;
+}
+
+interface PluginAuthor {
+    name: string;
+    id: bigint;
+}
+```
+
+### Example
+
+```typescript
+export default definePlugin({
+    name: "MyPlugin",
+    description: "Does something useful",
+    authors: [{ name: "Dev", id: 123456789n }],
+
+    start() { },
+    stop() { }
+});
+```
+
+---
+
+## `definePluginSettings`
+
+**Import:** `import { definePluginSettings } from "@api/Settings"`
+
+Creates a typed settings definition for a plugin. The result attaches to `definePlugin` via the `settings` property.
+
+### Signature
+
+```typescript
+function definePluginSettings<T extends SettingsDefinition>(
+    definition: T,
+    checks?: SettingsChecks<T>
+): DefinedSettings<T>
+```
+
+### SettingsDefinition
+
+An object where each key is a setting name and the value is a setting config:
+
+```typescript
+type SettingConfig =
+    | BooleanSetting
+    | StringSetting
+    | NumberSetting
+    | BigIntSetting
+    | SelectSetting
+    | MultiSelectSetting
+    | SliderSetting
+    | ComponentSetting;
+```
+
+### Accessing Values
+
+```typescript
+const settings = definePluginSettings({ ... });
+
+// Read
+const value = settings.store.myKey;
+
+// Write (persists automatically)
+settings.store.myKey = newValue;
+
+// Use in a component
+function MyComponent() {
+    const { myKey } = settings.use(["myKey"]);
+    return <div>{myKey}</div>;
+}
+```
+
+---
+
+## `OptionType`
+
+**Import:** `import { OptionType } from "@utils/types"`
+
+Enum of all available setting types.
+
+```typescript
+enum OptionType {
+    BOOLEAN,       // Toggle switch
+    NUMBER,        // Number input
+    BIGINT,        // BigInt input (for Discord IDs)
+    STRING,        // Text input
+    SELECT,        // Dropdown menu
+    MULTISELECT,   // Multi-select list
+    SLIDER,        // Range slider
+    COMPONENT,     // Custom React component
+}
+```
+
+### Type to Value Mapping
+
+| OptionType | TypeScript Value Type |
+|-----------|----------------------|
+| `BOOLEAN` | `boolean` |
+| `NUMBER` | `number` |
+| `BIGINT` | `bigint` |
+| `STRING` | `string` |
+| `SELECT` | `string` (option value) |
+| `MULTISELECT` | `string[]` |
+| `SLIDER` | `number` |
+| `COMPONENT` | `undefined` |
+
+---
+
+## `StartAt`
+
+**Import:** `import { StartAt } from "@utils/types"`
+
+Controls when a plugin's `start()` is called during Discord's startup sequence.
+
+```typescript
+enum StartAt {
+    Init,                // Very early: before most Discord code runs
+    WebpackReady,        // After Webpack module system initializes
+    DOMContentLoaded,    // After DOM is interactive (DEFAULT)
+}
+```
+
+### Usage
+
+```typescript
+export default definePlugin({
+    name: "EarlyPlugin",
+    startAt: StartAt.WebpackReady,
+    start() {
+        // Webpack modules are available here
+    }
+});
+```
+
+---
+
+## `Patch` Interface
+
+Used in the `patches` array:
+
+```typescript
+interface Patch {
+    find: string | RegExp;
+    replacement: PatchReplacement | PatchReplacement[];
+    predicate?(): boolean;
+    all?: boolean;
+    noWarn?: boolean;
+}
+
+interface PatchReplacement {
+    match: string | RegExp;
+    replace: string | ((match: string, ...groups: string[]) => string);
+}
+```
+
+---
+
+## `Command` Interface
+
+Used in the `commands` array:
+
+```typescript
+interface Command {
+    name: string;
+    description: string;
+    options?: CommandOption[];
+    execute(options: CommandOption[], ctx: CommandContext): CommandResult | void;
+    autocomplete?(option: CommandOption): AutocompleteResult[];
+    predicate?(ctx: CommandContext): boolean;
+}
+
+interface CommandContext {
+    channel: Channel;
+    guild: Guild | null;
+}
+
+interface CommandResult {
+    content: string;
+}
+```
+
+---
+
+## Constants
+
+**Import:** `import { IS_DISCORD_DESKTOP, IS_WEB, IS_PLEXTRON } from "@utils/constants"`
+
+```typescript
+const IS_DISCORD_DESKTOP: boolean;  // Running in Discord's Electron app
+const IS_WEB: boolean;              // Running in browser
+const IS_PLEXTRON: boolean;         // Running in Plextron
+const IS_DEV: boolean;              // Development build
+```
+
+## Next Steps
+
+<Cards>
+  <Card title="Data & Storage" href="/docs/api-reference/data-storage">
+    Persist data across Discord sessions with DataStore.
+  </Card>
+  <Card title="Notifications" href="/docs/api-reference/notifications">
+    Show alerts and toasts in Discord.
+  </Card>
+</Cards>

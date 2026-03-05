@@ -1,0 +1,293 @@
+﻿---
+title: Message Decorations
+description: Add visual decorations and accessories to Discord messages using Plexcord's Message Decorations and Accessories APIs.
+published: 2026-03-02
+tags: [message-decorations, accessories, UI, components, messages]
+---
+
+{/*
+ * This file is part of docs.plexcord.club.
+ * Copyright (c) 2026 Plexcord.
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ */}
+
+# Message Decorations
+
+Plexcord provides two ways to add UI elements to Discord messages:
+
+1. **Decorations**: Elements that appear next to usernames
+2. **Accessories**: Elements that appear below message content
+
+## Message Decorations
+
+Decorations are small elements that appear beside a user's name in messages. Common uses: badges, icons, status indicators.
+
+### Registering a Decoration
+
+```typescript
+import { addDecoration, removeDecoration } from "@api/MessageDecorations";
+
+// Define the decoration component
+function MyDecoration({ user, message }: {
+    user: { id: string; username: string };
+    message: { id: string; content: string };
+}) {
+    return (
+        <span style={{
+            color: "#FFD700",
+            fontSize: "12px",
+            marginLeft: "4px"
+        }}>
+            ★
+        </span>
+    );
+}
+
+export default definePlugin({
+    name: "StarDecorator",
+    description: "Adds a star next to usernames",
+    authors: [{ name: "You", id: 0n }],
+
+    start() {
+        // The first arg is a unique identifier string
+        addDecoration("star-decorator", MyDecoration);
+    },
+
+    stop() {
+        removeDecoration("star-decorator");
+    }
+});
+```
+
+### Conditional Decorations
+
+Show the decoration only for specific users or conditions:
+
+```typescript
+import { definePluginSettings } from "@api/Settings";
+import { OptionType } from "@utils/types";
+
+const settings = definePluginSettings({
+    targetUserId: {
+        type: OptionType.STRING,
+        description: "Show star next to this user ID",
+        default: ""
+    }
+});
+
+function StarForUser({ user }: { user: { id: string } }) {
+    if (user.id !== settings.store.targetUserId) return null;
+
+    return <span style={{ color: "#FFD700" }}>★</span>;
+}
+```
+
+## Message Accessories
+
+Accessories appear **below** message content. They're ideal for adding extra info, previews, or action buttons below messages.
+
+### Registering an Accessory
+
+```typescript
+import { addMessageAccessory, removeMessageAccessory } from "@api/MessageAccessories";
+
+function MessageStats({ message }: { message: any }) {
+    const wordCount = message.content.split(/\s+/).filter(Boolean).length;
+    const charCount = message.content.length;
+
+    // Return null to not show anything for this message
+    if (!message.content) return null;
+
+    return (
+        <div style={{
+            fontSize: "11px",
+            color: "var(--text-muted)",
+            marginTop: "4px",
+            padding: "4px 8px",
+            background: "var(--background-secondary)",
+            borderRadius: "4px",
+            display: "inline-block"
+        }}>
+            {wordCount} words · {charCount} characters
+        </div>
+    );
+}
+
+export default definePlugin({
+    name: "MessageStats",
+    description: "Shows word and character count below messages",
+    authors: [{ name: "You", id: 0n }],
+
+    start() {
+        // Priority number controls ordering among multiple accessories
+        addMessageAccessory("message-stats", MessageStats, 1);
+    },
+
+    stop() {
+        removeMessageAccessory("message-stats");
+    }
+});
+```
+
+### Accessory Priority
+
+When multiple plugins add accessories, the `priority` number controls the order:
+
+```typescript
+// Lower number = rendered first (higher up)
+addMessageAccessory("plugin-a", ComponentA, 1);  // Appears first
+addMessageAccessory("plugin-b", ComponentB, 10); // Appears after
+addMessageAccessory("plugin-c", ComponentC, 5);  // Appears between A and B
+```
+
+## Accessing Message Data
+
+Both decorations and accessories receive props about the message and author:
+
+```typescript
+// Typical props you receive
+interface MessageProps {
+    message: {
+        id: string;
+        content: string;
+        author: {
+            id: string;
+            username: string;
+            bot: boolean;
+        };
+        embeds: any[];
+        attachments: any[];
+        timestamp: Date;
+    };
+    channel: {
+        id: string;
+        name?: string;
+        guildId?: string;
+    };
+}
+```
+
+## Using React State in Decorations
+
+Decorations and accessories are full React components:
+
+```typescript
+import { React, useState } from "@webpack/common";
+
+function ExpandableAccessory({ message }: { message: any }) {
+    const [expanded, setExpanded] = useState(false);
+
+    if (!message.content.length > 200) return null;
+
+    return (
+        <div>
+            {expanded ? (
+                <div style={{ marginTop: "4px", color: "var(--text-muted)" }}>
+                    Full message details here...
+                    <button onClick={() => setExpanded(false)}>Collapse</button>
+                </div>
+            ) : (
+                <button
+                    onClick={() => setExpanded(true)}
+                    style={{ color: "var(--interactive-normal)", cursor: "pointer" }}
+                >
+                    Show details
+                </button>
+            )}
+        </div>
+    );
+}
+```
+
+## Complete Example: Link Preview Badge
+
+Shows a "🔗 Contains links" badge below messages with URLs:
+
+```typescript
+import definePlugin from "@utils/types";
+import { addMessageAccessory, removeMessageAccessory } from "@api/MessageAccessories";
+
+const URL_REGEX = /https?:\/\/[^\s]+/g;
+
+function LinkBadge({ message }: { message: any }) {
+    const urls = message.content.match(URL_REGEX);
+    if (!urls || urls.length === 0) return null;
+
+    return (
+        <span style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "4px",
+            fontSize: "11px",
+            color: "var(--text-link)",
+            background: "var(--background-secondary-alt)",
+            padding: "2px 6px",
+            borderRadius: "10px",
+            marginTop: "4px"
+        }}>
+            🔗 {urls.length} link{urls.length !== 1 ? "s" : ""}
+        </span>
+    );
+}
+
+export default definePlugin({
+    name: "LinkBadge",
+    description: "Shows link count below messages containing URLs",
+    authors: [{ name: "You", id: 0n }],
+
+    start() {
+        addMessageAccessory("link-badge", LinkBadge, 1);
+    },
+
+    stop() {
+        removeMessageAccessory("link-badge");
+    }
+});
+```
+
+## Styling Best Practices
+
+Use Discord's CSS variables for themed colors:
+
+```typescript
+// Text colors
+color: "var(--text-normal)"
+color: "var(--text-muted)"
+color: "var(--text-link)"
+color: "var(--interactive-normal)"
+
+// Background colors
+background: "var(--background-primary)"
+background: "var(--background-secondary)"
+background: "var(--background-secondary-alt)"
+background: "var(--background-floating)"
+
+// Brand colors
+color: "var(--brand-experiment)"  // Discord blurple
+```
+
+This ensures your decoration/accessory looks correct in both dark and light themes.
+
+## Next Steps
+
+<Cards>
+  <Card title="Buttons & UI" href="/docs/advanced-features/buttons-ui">
+    Add buttons to the chat bar and message toolbar.
+  </Card>
+  <Card title="API Reference" href="/docs/api-reference">
+    Complete API documentation for all Plexcord APIs.
+  </Card>
+</Cards>

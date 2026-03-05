@@ -1,0 +1,225 @@
+﻿---
+title: Notifications
+description: Show Discord notifications and toast messages from Plexcord plugins. showNotification and showToast API reference.
+published: 2026-03-02
+tags: [notifications, showNotification, showToast, alerts, UI]
+---
+
+{/*
+ * This file is part of docs.plexcord.club.
+ * Copyright (c) 2026 Plexcord.
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ */}
+
+# Notifications
+
+Plexcord provides two ways to alert users from your plugin:
+
+1. **Notifications**: Pop-up panels in the corner of Discord
+2. **Toasts**: Small dismissible banners at the bottom of Discord
+
+## Import
+
+```typescript
+import { showNotification } from "@api/Notifications";
+// or
+import { showToast, Toasts } from "@api/Notifications";
+```
+
+---
+
+## `showNotification`
+
+Shows a notification panel that floats in the bottom-right corner of Discord.
+
+### Signature
+
+```typescript
+function showNotification(options: NotificationData): void
+
+interface NotificationData {
+    title: string;          // Bold heading
+    body: string;           // Main message text
+    icon?: string;          // URL to an image/avatar to show
+    color?: string;         // Accent color hex (e.g., "#5865F2")
+    onClick?(): void;       // Called when the notification is clicked
+    onClose?(): void;       // Called when the notification is dismissed
+    permanent?: boolean;    // If true, stays until manually dismissed
+    noPersist?: boolean;    // If true, won't be saved to notification history
+}
+```
+
+### Basic Usage
+
+```typescript
+import { showNotification } from "@api/Notifications";
+
+// Simple notification
+showNotification({
+    title: "Hello!",
+    body: "Your plugin is working."
+});
+
+// With color and click action
+showNotification({
+    title: "⚠️ Rate Limit",
+    body: "You've been rate limited. Slow down!",
+    color: "#ED4245",  // Discord red
+    onClick: () => {
+        console.log("Notification clicked");
+    }
+});
+
+// With user avatar
+showNotification({
+    title: "Alice came online",
+    body: "Click to open their profile",
+    icon: `https://cdn.discordapp.com/avatars/${userId}/${avatarHash}.png`,
+    color: "#43B581",  // Discord green
+    onClick: () => openUserProfile(userId)
+});
+```
+
+### Color Reference
+
+Use Discord's standard colors for consistency:
+
+```typescript
+"#43B581"  // Green (online, success)
+"#FAA61A"  // Yellow (warning, idle)
+"#ED4245"  // Red (error, danger, DND)
+"#5865F2"  // Blurple (Discord brand)
+"#4F545C"  // Gray (neutral)
+```
+
+---
+
+## `showToast`
+
+Shows a small toast message at the **bottom** of Discord. Toasts are less intrusive than notifications.
+
+### Signature
+
+```typescript
+function showToast(
+    message: string,
+    type?: ToastType
+): void
+
+// Available toast types
+const Toasts = {
+    Type: {
+        MESSAGE: "message",   // Default: gray
+        SUCCESS: "success",   // Green checkmark
+        FAILURE: "failure",   // Red X
+        CUSTOM: "custom"      // Custom content
+    }
+};
+```
+
+### Usage
+
+```typescript
+import { showToast, Toasts } from "@api/Notifications";
+
+// Default toast
+showToast("Settings saved!");
+
+// Success toast (green)
+showToast("Plugin enabled!", Toasts.Type.SUCCESS);
+
+// Failure toast (red)
+showToast("Failed to connect.", Toasts.Type.FAILURE);
+```
+
+---
+
+## Choosing Between Notification and Toast
+
+| Feature | showNotification | showToast |
+|---------|-----------------|-----------|
+| Location | Bottom-right overlay | Bottom of screen |
+| Persistence | Stays until clicked/dismissed | Auto-disappears |
+| Interactivity | Has `onClick` handler | No interaction |
+| Visual weight | High: hard to miss | Low: subtle |
+| Best for | Important alerts, messages | Confirmations, status |
+
+---
+
+## Complete Example: Keyword Notifier
+
+```typescript
+import definePlugin, { OptionType } from "@utils/types";
+import { definePluginSettings } from "@api/Settings";
+import { showNotification } from "@api/Notifications";
+import { UserStore } from "@webpack/common";
+
+const settings = definePluginSettings({
+    keywords: {
+        type: OptionType.STRING,
+        description: "Comma-separated keywords to watch for",
+        default: "important, urgent, help"
+    }
+});
+
+export default definePlugin({
+    name: "KeywordNotifier",
+    description: "Notifies you when someone mentions specific keywords",
+    authors: [{ name: "You", id: 0n }],
+    settings,
+
+    flux: {
+        MESSAGE_CREATE({ message, channelId }) {
+            const me = UserStore.getCurrentUser();
+
+            // Don't notify for own messages
+            if (message.author.id === me?.id) return;
+
+            const keywords = settings.store.keywords
+                .split(",")
+                .map(k => k.trim().toLowerCase())
+                .filter(Boolean);
+
+            const content = message.content.toLowerCase();
+            const matched = keywords.find(kw => content.includes(kw));
+
+            if (matched) {
+                showNotification({
+                    title: `🔔 Keyword: "${matched}"`,
+                    body: `${message.author.username}: ${message.content.slice(0, 100)}`,
+                    color: "#FAA61A",
+                    onClick: () => {
+                        // Navigate to the channel
+                        const { NavigationUtils } = Vencord.Webpack.Common;
+                        NavigationUtils.transitionToGuild(message.guild_id, channelId);
+                    }
+                });
+            }
+        }
+    }
+});
+```
+
+## Next Steps
+
+<Cards>
+  <Card title="Utilities" href="/docs/api-reference/utilities">
+    Logger, sleep, debounce, and more helper functions.
+  </Card>
+  <Card title="Examples" href="/docs/examples">
+    See complete working plugin examples.
+  </Card>
+</Cards>

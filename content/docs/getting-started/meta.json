@@ -1,0 +1,14 @@
+{
+  "title": "Getting Started",
+  "icon": "Rocket",
+  "defaultOpen": true,
+  "pages": [
+    "index",
+    "prerequisites",
+    "editor-setup",
+    "quick-start",
+    "plugin-structure",
+    "adding-settings",
+    "next-steps"
+  ]
+}

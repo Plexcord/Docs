@@ -1,0 +1,108 @@
+﻿---
+title: Getting Started
+description: Set up your development environment and build your first Plexcord plugin.
+published: 2026-03-02
+---
+
+{/*
+ * This file is part of docs.plexcord.club.
+ * Copyright (c) 2026 Plexcord.
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ */}
+
+# Getting Started
+
+This section walks you through everything you need to write your first Plexcord plugin, from environment setup to a working, configurable plugin.
+
+If you haven't read the [Introduction](/docs) yet, it covers what Plexcord is and what makes its plugin system powerful. Come back here when you're ready to build.
+
+## Before You Begin
+
+You don't need to be an expert, but these basics will help:
+
+| Skill | Why it matters |
+|---|---|
+| **JavaScript / TypeScript** | Plugins are written in TypeScript |
+| **Basic React** | UI components use React and JSX |
+| **Command line** | Building and running Plexcord requires a terminal |
+| **Git** | Cloning the repo and managing your changes |
+
+If you're missing any of these, you'll pick them up as you go; the examples are practical and annotated.
+
+## Two Types of Plugins
+
+Before writing a single line, decide where your plugin lives:
+
+### Official Plugins: `src/plugins/`
+
+- Bundled with every Plexcord release
+- Tracked in git, reviewed by maintainers
+- Available to all users
+
+**Choose this** when you want to contribute your plugin to the Plexcord project.
+
+### UserPlugins: `src/userplugins/`
+
+- Private to your local installation
+- Not tracked in git, no review needed
+- Ideal for personal tools and experiments
+
+**Choose this** when you're building something just for yourself, or when you're still experimenting.
+
+Most developers start in `src/userplugins/` and move to `src/plugins/` when they're ready to contribute.
+
+## Your Path Through This Section
+
+Follow these steps in order:
+
+1. **[Prerequisites](/docs/getting-started/prerequisites)**: Install Node.js, pnpm, and clone the repo
+2. **[Quick Start](/docs/getting-started/quick-start)**: Build and run your first "Hello World" plugin
+3. **[Plugin Structure](/docs/getting-started/plugin-structure)**: Understand the anatomy of a plugin file
+4. **[Adding Settings](/docs/getting-started/adding-settings)**: Make your plugin configurable with a settings UI
+5. **[Next Steps](/docs/getting-started/next-steps)**: Where to go after the basics
+
+## Time Estimates
+
+| Milestone | Time |
+|---|---|
+| First working plugin | ~30 minutes |
+| Plugin with settings | ~1 hour |
+| Comfortable with Core Concepts | ~3 hours |
+| Advanced features (patches, commands, Flux) | ~5–10 hours |
+
+## Getting Help
+
+<Cards>
+  <Card 
+    title="GitHub Issues" 
+    href="https://github.com/MutanPlex/Plexcord/issues"
+    external
+  >
+    Report bugs or ask questions
+  </Card>
+  <Card 
+    title="Examples" 
+    href="/docs/examples"
+  >
+    Annotated, copy-paste-ready plugin code
+  </Card>
+</Cards>
+
+You can also use the search bar (Ctrl/Cmd + K) to find anything across the docs.
+
+---
+
+**Next:** [Prerequisites →](/docs/getting-started/prerequisites)

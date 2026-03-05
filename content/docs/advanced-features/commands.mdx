@@ -1,0 +1,303 @@
+﻿---
+title: Commands System
+description: Create custom Discord slash commands with Plexcord. Learn command options, autocomplete, message responses, and the full commands API.
+published: 2026-03-02
+tags: [commands, slash-commands, options, autocomplete, messages]
+---
+
+{/*
+ * This file is part of docs.plexcord.club.
+ * Copyright (c) 2026 Plexcord.
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ */}
+
+# Commands System
+
+Plexcord lets you register custom slash commands that appear in Discord's command menu. These commands are client-side only: they don't require a bot or server.
+
+## Basic Command
+
+Define commands in the `commands` array:
+
+```typescript
+import definePlugin from "@utils/types";
+import { sendBotMessage } from "@api/Commands";
+
+export default definePlugin({
+    name: "MyCommands",
+    description: "Custom slash commands",
+    authors: [{ name: "You", id: 0n }],
+
+    commands: [
+        {
+            name: "ping",
+            description: "Check if Plexcord is responding",
+            execute() {
+                return { content: "🏓 Pong! Plexcord is working." };
+            }
+        }
+    ]
+});
+```
+
+Type `/ping` in any Discord channel to use it. The response appears as a local message (only you see it).
+
+## Command Structure
+
+```typescript
+{
+    name: "mycommand",          // The /command name (lowercase, no spaces)
+    description: "Does X",     // Description shown in the command picker
+    options: [...],             // Input options (optional)
+    predicate: () => boolean,  // Only show when true (optional)
+    execute(options, ctx) {     // Handler function (required)
+        return { ... };
+    }
+}
+```
+
+## Returning Responses
+
+The value returned from `execute()` determines what message is sent:
+
+### Send a text response (local only)
+
+```typescript
+execute() {
+    return { content: "Hello from my plugin!" };
+}
+```
+
+This sends a message that **only you can see**. Discord treats it like a bot ephemeral message locally.
+
+### Send a message to the channel
+
+Use `sendMessage` to post a real message everyone can see:
+
+```typescript
+import { findByCodeLazy } from "@webpack";
+
+const sendMessage = findByCodeLazy("sendMessage");
+
+execute(_, ctx) {
+    sendMessage(ctx.channel.id, {
+        content: "This message is visible to everyone!"
+    });
+    // Return undefined to not show a local response
+}
+```
+
+### Show a notification
+
+```typescript
+import { showNotification } from "@api/Notifications";
+
+execute() {
+    showNotification({ title: "Done!", body: "Command executed." });
+    // Return void to not send any message
+}
+```
+
+## Command Options
+
+Add input options to collect values from the user:
+
+```typescript
+import { ApplicationCommandOptionType } from "@discord-types/general";
+
+commands: [
+    {
+        name: "remind",
+        description: "Set a reminder",
+        options: [
+            {
+                name: "message",
+                description: "What to remind you about",
+                type: ApplicationCommandOptionType.STRING,
+                required: true
+            },
+            {
+                name: "minutes",
+                description: "Minutes from now",
+                type: ApplicationCommandOptionType.INTEGER,
+                required: true,
+                minValue: 1,
+                maxValue: 1440  // 24 hours
+            }
+        ],
+        execute(options) {
+            const message = options.find(o => o.name === "message")?.value as string;
+            const minutes = options.find(o => o.name === "minutes")?.value as number;
+
+            setTimeout(() => {
+                showNotification({
+                    title: "⏰ Reminder",
+                    body: message
+                });
+            }, minutes * 60 * 1000);
+
+            return { content: `⏰ Reminder set for ${minutes} minute(s): "${message}"` };
+        }
+    }
+]
+```
+
+## Option Types
+
+| Type | Description | Example Value |
+|------|-------------|---------------|
+| `STRING` | Text input | `"hello world"` |
+| `INTEGER` | Whole number | `42` |
+| `NUMBER` | Decimal number | `3.14` |
+| `BOOLEAN` | True/false | `true` |
+| `USER` | Discord user mention | User object |
+| `CHANNEL` | Channel mention | Channel object |
+| `ROLE` | Role mention | Role object |
+
+## Autocomplete
+
+Provide dynamic suggestions as the user types:
+
+```typescript
+commands: [
+    {
+        name: "theme",
+        description: "Switch to a theme",
+        options: [
+            {
+                name: "name",
+                description: "Theme name",
+                type: ApplicationCommandOptionType.STRING,
+                required: true,
+                autocomplete: true  // Enable autocomplete
+            }
+        ],
+        // Called as user types
+        autocomplete(option) {
+            if (option.name === "name") {
+                const themes = ["Dark", "Light", "Midnight", "Ocean", "Forest"];
+                const query = option.focused ? option.value as string : "";
+
+                return themes
+                    .filter(t => t.toLowerCase().startsWith(query.toLowerCase()))
+                    .map(t => ({ name: t, value: t.toLowerCase() }));
+            }
+            return [];
+        },
+        execute(options) {
+            const name = options.find(o => o.name === "name")?.value as string;
+            return { content: `Switching to theme: ${name}` };
+        }
+    }
+]
+```
+
+## The `ctx` Parameter
+
+The second argument to `execute()` contains context about where the command was invoked:
+
+```typescript
+execute(options, ctx) {
+    ctx.channel.id      // Current channel ID
+    ctx.channel.name    // Channel name
+    ctx.guild?.id       // Server ID (undefined in DMs)
+    ctx.guild?.name     // Server name
+}
+```
+
+## Hiding Commands Conditionally
+
+Use `predicate` to only show the command in certain contexts:
+
+```typescript
+commands: [
+    {
+        name: "admin-only",
+        description: "Only visible to server admins",
+        predicate(ctx) {
+            // Only show in servers, not DMs
+            return ctx.guild !== null;
+        },
+        execute() {
+            return { content: "Admin command executed!" };
+        }
+    }
+]
+```
+
+## Complete Example: /mock
+
+This command converts text to AlTeRnAtInG cAsE:
+
+```typescript
+import definePlugin from "@utils/types";
+import { ApplicationCommandOptionType } from "@discord-types/general";
+
+export default definePlugin({
+    name: "MockCommand",
+    description: "Converts text to mocking spongebob case",
+    authors: [{ name: "You", id: 0n }],
+
+    commands: [
+        {
+            name: "mock",
+            description: "Convert text to AlTeRnAtInG cAsE",
+            options: [
+                {
+                    name: "text",
+                    description: "Text to convert",
+                    type: ApplicationCommandOptionType.STRING,
+                    required: true
+                },
+                {
+                    name: "send",
+                    description: "Send publicly (not just to you)",
+                    type: ApplicationCommandOptionType.BOOLEAN,
+                    required: false
+                }
+            ],
+            execute(options, ctx) {
+                const text = options.find(o => o.name === "text")?.value as string;
+                const sendPublic = options.find(o => o.name === "send")?.value as boolean;
+
+                const mocked = text
+                    .split("")
+                    .map((c, i) => i % 2 === 0 ? c.toLowerCase() : c.toUpperCase())
+                    .join("");
+
+                if (sendPublic) {
+                    // Post to channel (visible to all)
+                    const { sendMessage } = Vencord.Webpack.Common;
+                    sendMessage(ctx.channel.id, { content: mocked });
+                } else {
+                    return { content: mocked };  // Local only
+                }
+            }
+        }
+    ]
+});
+```
+
+## Next Steps
+
+<Cards>
+  <Card title="Flux Events" href="/docs/advanced-features/flux-events">
+    React to Discord events in real time.
+  </Card>
+  <Card title="Context Menus" href="/docs/advanced-features/context-menus">
+    Add right-click menu items.
+  </Card>
+</Cards>

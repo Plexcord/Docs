@@ -1,0 +1,310 @@
+﻿---
+title: Adding Settings
+description: Add a settings panel to your Plexcord plugin. Learn all OptionTypes including BOOLEAN, STRING, NUMBER, SELECT, and SLIDER.
+published: 2026-03-02
+tags: [settings, definePluginSettings, OptionType, UI]
+---
+
+{/*
+ * This file is part of docs.plexcord.club.
+ * Copyright (c) 2026 Plexcord.
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ */}
+
+# Adding Settings
+
+Settings let users configure your plugin without touching code. Plexcord provides a simple API to define a settings panel that automatically appears in Discord's settings UI.
+
+## Basic Setup
+
+Use `definePluginSettings` to define your settings schema:
+
+```typescript
+import definePlugin, { OptionType } from "@utils/types";
+import { definePluginSettings } from "@api/Settings";
+
+const settings = definePluginSettings({
+    enabled: {
+        type: OptionType.BOOLEAN,
+        description: "Enable the main feature",
+        default: true
+    }
+});
+
+export default definePlugin({
+    name: "MyPlugin",
+    description: "A plugin with settings",
+    authors: [{ name: "You", id: 0n }],
+    settings,   // <-- attach settings here
+
+    start() {
+        // Read settings via settings.store
+        if (settings.store.enabled) {
+            console.log("Feature is enabled!");
+        }
+    }
+});
+```
+
+## All Option Types
+
+### BOOLEAN: Toggle Switch
+
+The most common type. Renders as an ON/OFF toggle.
+
+```typescript
+showBadge: {
+    type: OptionType.BOOLEAN,
+    description: "Show badge next to username",
+    default: true
+},
+```
+
+### STRING: Text Input
+
+A single-line text input field.
+
+```typescript
+customPrefix: {
+    type: OptionType.STRING,
+    description: "Prefix added to your messages",
+    default: "✨",
+    placeholder: "Enter a prefix..."
+},
+```
+
+### NUMBER: Number Input
+
+A numeric input field.
+
+```typescript
+messageDelay: {
+    type: OptionType.NUMBER,
+    description: "Delay between messages in milliseconds",
+    default: 1000
+},
+```
+
+### SELECT: Dropdown
+
+A dropdown menu with predefined options.
+
+```typescript
+theme: {
+    type: OptionType.SELECT,
+    description: "Choose notification style",
+    default: "toast",
+    options: [
+        { label: "Toast notification", value: "toast", default: true },
+        { label: "Desktop notification", value: "desktop" },
+        { label: "Silent (console only)", value: "silent" }
+    ]
+},
+```
+
+<Callout type="info">
+  Mark one option with `default: true` in the array to show it as the pre-selected option.
+</Callout>
+
+### SLIDER: Range Slider
+
+A visual slider for numeric ranges.
+
+```typescript
+volume: {
+    type: OptionType.SLIDER,
+    description: "Notification volume",
+    default: 50,
+    markers: [0, 25, 50, 75, 100],
+    stickToMarkers: true
+},
+```
+
+### COMPONENT: Custom React Component
+
+Render any React component in the settings panel.
+
+```typescript
+import { Button } from "@webpack/common";
+
+clearCache: {
+    type: OptionType.COMPONENT,
+    description: "Clear the plugin cache",
+    component: () => (
+        <Button onClick={() => clearMyCache()}>
+            Clear Cache
+        </Button>
+    )
+},
+```
+
+## Reading Settings
+
+Access setting values via `settings.store`:
+
+```typescript
+const settings = definePluginSettings({
+    delay: {
+        type: OptionType.NUMBER,
+        description: "Delay in ms",
+        default: 500
+    },
+    prefix: {
+        type: OptionType.STRING,
+        description: "Message prefix",
+        default: "✨"
+    }
+});
+
+export default definePlugin({
+    // ...
+    start() {
+        const delay = settings.store.delay;    // number
+        const prefix = settings.store.prefix;  // string
+        console.log(`Using ${prefix} with ${delay}ms delay`);
+    }
+});
+```
+
+TypeScript will automatically infer the correct type for each setting based on its `OptionType`.
+
+## Reacting to Setting Changes
+
+Use `onChange` to run code whenever a setting is changed by the user:
+
+```typescript
+const settings = definePluginSettings({
+    logMessages: {
+        type: OptionType.BOOLEAN,
+        description: "Log all messages to console",
+        default: false,
+        onChange(value) {
+            if (value) {
+                console.log("[MyPlugin] Message logging enabled");
+            } else {
+                console.log("[MyPlugin] Message logging disabled");
+            }
+        }
+    }
+});
+```
+
+## Hiding Settings
+
+Use `hidden` to show/hide settings based on other values:
+
+```typescript
+const settings = definePluginSettings({
+    enableLogging: {
+        type: OptionType.BOOLEAN,
+        description: "Enable logging",
+        default: false
+    },
+    logLevel: {
+        type: OptionType.SELECT,
+        description: "Log verbosity level",
+        default: "info",
+        options: [
+            { label: "Info", value: "info" },
+            { label: "Verbose", value: "verbose" },
+            { label: "Debug", value: "debug" }
+        ],
+        hidden: () => !settings.store.enableLogging
+    }
+});
+```
+
+## Complete Example
+
+Here's a realistic plugin with multiple settings types:
+
+```typescript
+import definePlugin, { OptionType } from "@utils/types";
+import { definePluginSettings } from "@api/Settings";
+import { showNotification } from "@api/Notifications";
+
+const settings = definePluginSettings({
+    enabled: {
+        type: OptionType.BOOLEAN,
+        description: "Enable message alerts",
+        default: true
+    },
+    keywords: {
+        type: OptionType.STRING,
+        description: "Comma-separated keywords to watch for",
+        default: "important, urgent",
+        placeholder: "word1, word2, ..."
+    },
+    notificationStyle: {
+        type: OptionType.SELECT,
+        description: "How to show alerts",
+        default: "notification",
+        options: [
+            { label: "Discord Notification", value: "notification", default: true },
+            { label: "Console Log Only", value: "console" }
+        ]
+    },
+    volume: {
+        type: OptionType.SLIDER,
+        description: "Alert sound volume",
+        default: 75,
+        markers: [0, 25, 50, 75, 100],
+        stickToMarkers: false
+    }
+});
+
+export default definePlugin({
+    name: "KeywordAlert",
+    description: "Alerts you when specific keywords appear in messages",
+    authors: [{ name: "You", id: 0n }],
+    settings,
+
+    flux: {
+        MESSAGE_CREATE({ message }) {
+            if (!settings.store.enabled) return;
+
+            const keywords = settings.store.keywords
+                .split(",")
+                .map(k => k.trim().toLowerCase());
+
+            const content = message.content.toLowerCase();
+            const matched = keywords.find(kw => content.includes(kw));
+
+            if (matched) {
+                if (settings.store.notificationStyle === "notification") {
+                    showNotification({
+                        title: "Keyword Alert",
+                        body: `"${matched}" was mentioned!`
+                    });
+                } else {
+                    console.log(`[KeywordAlert] Keyword "${matched}" found in message`);
+                }
+            }
+        }
+    }
+});
+```
+
+## Next Steps
+
+<Cards>
+  <Card title="Next Steps" href="/docs/getting-started/next-steps">
+    Where to go now that you know the basics.
+  </Card>
+  <Card title="Core Concepts" href="/docs/core-concepts">
+    Deep dive into plugin lifecycle and settings system.
+  </Card>
+</Cards>

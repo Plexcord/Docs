@@ -1,0 +1,273 @@
+﻿---
+title: Context Menus
+description: Add items to Discord right-click menus using Plexcord's Context Menu API. User menus, message menus, channel menus, and more.
+published: 2026-03-02
+tags: [context-menus, right-click, UI, patching, menus]
+---
+
+{/*
+ * This file is part of docs.plexcord.club.
+ * Copyright (c) 2026 Plexcord.
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ */}
+
+# Context Menus
+
+Context menus are the right-click menus that appear when you right-click on users, messages, channels, and other Discord elements. Plexcord's Context Menu API lets you add your own items to these menus.
+
+## Setup
+
+Import the Context Menu API:
+
+```typescript
+import { addContextMenuPatch, NavContextMenuPatchCallback, removeContextMenuPatch } from "@api/ContextMenu";
+import { Menu } from "@webpack/common";
+```
+
+## Basic Context Menu Item
+
+```typescript
+import definePlugin from "@utils/types";
+import { addContextMenuPatch, removeContextMenuPatch, NavContextMenuPatchCallback } from "@api/ContextMenu";
+import { Menu } from "@webpack/common";
+
+// Define the patch function outside definePlugin for easy reference
+const userContextPatch: NavContextMenuPatchCallback = (children, { user }) => {
+    children.push(
+        <Menu.MenuItem
+            id="my-plugin-action"
+            label="My Plugin Action"
+            action={() => {
+                alert(`You right-clicked on ${user.username}!`);
+            }}
+        />
+    );
+};
+
+export default definePlugin({
+    name: "ContextMenuExample",
+    description: "Adds item to user context menu",
+    authors: [{ name: "You", id: 0n }],
+
+    start() {
+        // "user-context" = right-click on a user
+        addContextMenuPatch("user-context", userContextPatch);
+    },
+
+    stop() {
+        removeContextMenuPatch("user-context", userContextPatch);
+    }
+});
+```
+
+## Context Menu Types
+
+| String ID | When it appears |
+|-----------|----------------|
+| `"user-context"` | Right-clicking a user |
+| `"message"` | Right-clicking a message |
+| `"channel-context"` | Right-clicking a channel |
+| `"guild-context"` | Right-clicking a server name |
+| `"guild-header-popout"` | Server settings popout |
+| `"expression-picker"` | Emoji/GIF picker |
+
+## Menu Component Types
+
+### `Menu.MenuItem`: Simple Clickable Item
+
+```typescript
+<Menu.MenuItem
+    id="unique-id"             // Required, must be unique
+    label="Click Me"           // Display text
+    action={() => doThing()}   // Click handler
+    icon={SomeIcon}            // Optional icon (lucide-react or Discord icon)
+    disabled={false}           // Gray out and disable click
+    color="danger"             // Color variant: "danger" for red
+/>
+```
+
+### `Menu.MenuGroup`: Group Items with Separator
+
+```typescript
+<Menu.MenuGroup>
+    <Menu.MenuItem id="item-1" label="First Action" action={() => {}} />
+    <Menu.MenuItem id="item-2" label="Second Action" action={() => {}} />
+</Menu.MenuGroup>
+```
+
+### `Menu.MenuSeparator`: Horizontal Divider
+
+```typescript
+<>
+    <Menu.MenuSeparator />
+    <Menu.MenuItem id="my-item" label="After separator" action={() => {}} />
+</>
+```
+
+### `Menu.MenuCheckboxItem`: Checkbox Toggle
+
+```typescript
+<Menu.MenuCheckboxItem
+    id="toggle-feature"
+    label="Enable feature"
+    checked={isEnabled}
+    action={() => setIsEnabled(!isEnabled)}
+/>
+```
+
+### `Menu.MenuRadioItem`: Radio Button Group
+
+```typescript
+<Menu.MenuGroup>
+    <Menu.MenuRadioItem
+        id="mode-a"
+        group="myPlugin-mode"
+        label="Mode A"
+        checked={mode === "a"}
+        action={() => setMode("a")}
+    />
+    <Menu.MenuRadioItem
+        id="mode-b"
+        group="myPlugin-mode"
+        label="Mode B"
+        checked={mode === "b"}
+        action={() => setMode("b")}
+    />
+</Menu.MenuGroup>
+```
+
+## Accessing Context Data
+
+The second argument to your patch callback contains context data about what was right-clicked:
+
+### User context
+
+```typescript
+const patch: NavContextMenuPatchCallback = (children, { user, guildId }) => {
+    const userId = user.id;
+    const username = user.username;
+    const isInServer = !!guildId;
+    // ...
+};
+addContextMenuPatch("user-context", patch);
+```
+
+### Message context
+
+```typescript
+const patch: NavContextMenuPatchCallback = (children, { message, channel }) => {
+    const content = message.content;
+    const authorId = message.author.id;
+    const channelId = channel.id;
+    // ...
+};
+addContextMenuPatch("message", patch);
+```
+
+### Channel context
+
+```typescript
+const patch: NavContextMenuPatchCallback = (children, { channel, guild }) => {
+    const channelName = channel.name;
+    const channelType = channel.type;
+    const guildName = guild?.name;
+    // ...
+};
+addContextMenuPatch("channel-context", patch);
+```
+
+## Complete Example: Copy User ID
+
+Adds a "Copy User ID" button to the user right-click menu:
+
+```typescript
+import definePlugin from "@utils/types";
+import { addContextMenuPatch, removeContextMenuPatch, NavContextMenuPatchCallback } from "@api/ContextMenu";
+import { Menu } from "@webpack/common";
+import { Clipboard } from "@webpack/common";
+
+const userContextPatch: NavContextMenuPatchCallback = (children, { user }) => {
+    children.push(
+        <Menu.MenuGroup>
+            <Menu.MenuItem
+                id="copy-user-id"
+                label="Copy User ID"
+                action={() => {
+                    Clipboard.copy(user.id);
+                }}
+            />
+        </Menu.MenuGroup>
+    );
+};
+
+const messageContextPatch: NavContextMenuPatchCallback = (children, { message }) => {
+    children.push(
+        <Menu.MenuItem
+            id="copy-message-id"
+            label="Copy Message ID"
+            color="default"
+            action={() => {
+                Clipboard.copy(message.id);
+            }}
+        />
+    );
+};
+
+export default definePlugin({
+    name: "CopyIDs",
+    description: "Adds 'Copy ID' to right-click menus",
+    authors: [{ name: "You", id: 0n }],
+
+    start() {
+        addContextMenuPatch("user-context", userContextPatch);
+        addContextMenuPatch("message", messageContextPatch);
+    },
+
+    stop() {
+        removeContextMenuPatch("user-context", userContextPatch);
+        removeContextMenuPatch("message", messageContextPatch);
+    }
+});
+```
+
+## Inserting Items at a Specific Position
+
+The `children` array represents all menu items. You can `push()` to add at the end, `unshift()` to add at the beginning, or `splice()` for a specific position:
+
+```typescript
+const patch: NavContextMenuPatchCallback = (children, data) => {
+    // Add at the very beginning
+    children.unshift(
+        <Menu.MenuItem id="first-item" label="I'm first!" action={() => {}} />
+    );
+
+    // Add after the 2nd item
+    children.splice(2, 0,
+        <Menu.MenuItem id="middle-item" label="I'm in the middle" action={() => {}} />
+    );
+};
+```
+
+## Next Steps
+
+<Cards>
+  <Card title="Message Decorations" href="/docs/advanced-features/message-decorations">
+    Add visual elements to Discord messages.
+  </Card>
+  <Card title="Buttons & UI" href="/docs/advanced-features/buttons-ui">
+    Add buttons to the chat bar and message toolbar.
+  </Card>
+</Cards>

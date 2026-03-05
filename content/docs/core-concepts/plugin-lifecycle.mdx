@@ -1,0 +1,270 @@
+﻿---
+title: Plugin Lifecycle
+description: Understand the complete Plexcord plugin lifecycle. Learn when start(), stop(), and startAt run, and how to manage resources correctly.
+published: 2026-03-02
+tags: [lifecycle, start, stop, startAt, initialization]
+---
+
+{/*
+ * This file is part of docs.plexcord.club.
+ * Copyright (c) 2026 Plexcord.
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ */}
+
+# Plugin Lifecycle
+
+Understanding when your plugin code runs is critical for writing correct, well-behaved plugins. This guide covers the complete lifecycle from Discord startup to plugin shutdown.
+
+## Overview
+
+```
+Discord launches
+    └── Plexcord initializes
+          ├── StartAt.Init        → plugins with startAt: StartAt.Init
+          ├── StartAt.WebpackReady → plugins with startAt: StartAt.WebpackReady
+          └── StartAt.DOMContentLoaded (default) → most plugins
+                └── start() is called
+                       └── [plugin runs until disabled or Discord closes]
+                              └── stop() is called
+```
+
+## Phase 1: Discord Starts
+
+When Discord launches, the Plexcord core loader runs before most of Discord's UI is available. At this point:
+
+- The DOM may not be fully loaded
+- Discord Webpack modules may not be available
+- Most Discord APIs are not accessible
+
+## Phase 2: Choosing Your Init Point with startAt
+
+The `startAt` property controls exactly when your plugin's `start()` function is called during the Discord startup sequence.
+
+```typescript
+import definePlugin, { StartAt } from "@utils/types";
+
+export default definePlugin({
+    name: "MyPlugin",
+    description: "...",
+    authors: [{ name: "You", id: 0n }],
+
+    startAt: StartAt.WebpackReady,  // Start after Webpack modules load
+
+    start() {
+        // Webpack modules are guaranteed available here
+        const { MessageStore } = require("@webpack/common");
+    }
+});
+```
+
+### StartAt Values
+
+| Value | When it runs | Available APIs |
+|-------|-------------|----------------|
+| `StartAt.Init` | Very early, before Discord renders | Minimal: only native APIs |
+| `StartAt.WebpackReady` | After Webpack module system loads | Discord modules via `@webpack` |
+| `StartAt.DOMContentLoaded` | After DOM is interactive (default) | Full DOM + Discord APIs |
+
+<Callout type="info">
+  **When in doubt, use the default.** `StartAt.DOMContentLoaded` is appropriate for 95% of plugins. Only use `Init` or `WebpackReady` if you need to run code before the UI is ready.
+</Callout>
+
+## Phase 3: Plugin Initialization with `start()`
+
+`start()` is called once when your plugin is activated. This happens at:
+- Discord startup (if plugin is already enabled)
+- When the user enables the plugin in settings
+- Plugin reload during development
+
+```typescript
+start() {
+    // ✅ Set up intervals
+    this.interval = setInterval(() => this.tick(), 5000);
+
+    // ✅ Add DOM event listeners
+    document.addEventListener("keydown", this.onKeyDown = this.onKeyDown.bind(this));
+
+    // ✅ Subscribe to Flux events (done via the flux: {} property, not here)
+
+    // ✅ Modify the DOM
+    document.body.classList.add("my-plugin-active");
+
+    console.log("[MyPlugin] Started");
+},
+```
+
+### What to Do in `start()`
+
+- Initialize timers and intervals
+- Register event listeners
+- Mutate the DOM if needed
+- Load plugin state from storage
+- Set up your plugin's core logic
+
+## Phase 4: Plugin Runs
+
+While enabled, your plugin reacts to events via:
+
+- **Flux listeners**: Discord internal events (`MESSAGE_CREATE`, etc.)
+- **Patches**: Code modifications active while plugin is enabled
+- **Commands**: Slash commands registered while plugin is enabled
+- **DOM observers**: Used when you set up mutation observers
+
+## Phase 5: Plugin Shutdown with `stop()`
+
+`stop()` is called when:
+- The user disables the plugin in settings
+- Discord is closing
+- Plugin is being reloaded during development
+
+**This is the most important phase to get right.** Every resource created in `start()` must be cleaned up here. If you don't, effects will linger after the plugin is disabled.
+
+```typescript
+stop() {
+    // ✅ Clear timers
+    clearInterval(this.interval);
+    clearTimeout(this.timeout);
+
+    // ✅ Remove DOM event listeners
+    document.removeEventListener("keydown", this.onKeyDown);
+
+    // ✅ Undo DOM changes
+    document.body.classList.remove("my-plugin-active");
+
+    // ✅ Reset state
+    this.cache = null;
+
+    console.log("[MyPlugin] Stopped");
+},
+```
+
+### The Golden Rule of `stop()`
+
+> **Remove everything you added in `start()`.**
+
+Failing to clean up leads to:
+- Visual artifacts in Discord's UI
+- Memory leaks
+- Event handlers firing after plugin is disabled
+- Confusing bugs that appear intermittently
+
+## Storing Plugin State
+
+Use `this` to store state within your plugin instance:
+
+```typescript
+export default definePlugin({
+    name: "MyPlugin",
+    description: "...",
+    authors: [{ name: "You", id: 0n }],
+
+    // Declare properties for TypeScript
+    interval: null as ReturnType<typeof setInterval> | null,
+    messageCount: 0,
+
+    start() {
+        this.messageCount = 0;
+        this.interval = setInterval(() => {
+            console.log(`Messages since start: ${this.messageCount}`);
+        }, 10000);
+    },
+
+    stop() {
+        if (this.interval) clearInterval(this.interval);
+    },
+
+    flux: {
+        MESSAGE_CREATE() {
+            // Access via Vencord.Plugins.plugins.MyPlugin.messageCount
+            // Note: 'this' in flux handlers refers to the plugin object
+        }
+    }
+});
+```
+
+## Async Initialization
+
+If your `start()` needs to do async work (fetch data, load from storage), use an async IIFE:
+
+```typescript
+start() {
+    // Don't make start() async: use an IIFE instead
+    void (async () => {
+        const data = await DataStore.get("myPlugin_data");
+        this.cachedData = data ?? [];
+        console.log("[MyPlugin] Data loaded:", this.cachedData.length, "items");
+    })();
+},
+```
+
+<Callout type="warning">
+  **Don't make `start()` itself async.** Plexcord doesn't await the return value. Instead, use a self-calling async function inside `start()`.
+</Callout>
+
+## Complete Lifecycle Example
+
+```typescript
+import definePlugin from "@utils/types";
+import { Logger } from "@utils/Logger";
+
+const logger = new Logger("LifecycleDemo", "#00BFFF");
+
+export default definePlugin({
+    name: "LifecycleDemo",
+    description: "Demonstrates the full plugin lifecycle",
+    authors: [{ name: "Dev", id: 0n }],
+
+    // State
+    ticker: null as ReturnType<typeof setInterval> | null,
+    count: 0,
+
+    start() {
+        logger.info("Plugin starting...");
+
+        this.count = 0;
+        this.ticker = setInterval(() => {
+            this.count++;
+            logger.info(`Tick #${this.count}`);
+        }, 3000);
+
+        document.body.dataset.lifecycleDemo = "active";
+        logger.info("Plugin started. Ticker running every 3s.");
+    },
+
+    stop() {
+        logger.info("Plugin stopping...");
+
+        if (this.ticker) {
+            clearInterval(this.ticker);
+            this.ticker = null;
+        }
+
+        delete document.body.dataset.lifecycleDemo;
+        logger.info(`Plugin stopped. Total ticks: ${this.count}`);
+    }
+});
+```
+
+## Next Steps
+
+<Cards>
+  <Card title="Plugin Metadata" href="/docs/core-concepts/plugin-metadata">
+    Learn all the optional metadata fields that control plugin behavior.
+  </Card>
+  <Card title="Debugging" href="/docs/core-concepts/debugging">
+    Learn to use the Logger and DevTools to debug lifecycle issues.
+  </Card>
+</Cards>

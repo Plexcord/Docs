@@ -1,0 +1,161 @@
+﻿---
+title: Examples
+description: Copy-paste working Plexcord plugin examples. Beginner to advanced complexity with inline explanations.
+published: 2026-03-02
+tags: [examples, code, plugins, tutorials]
+---
+
+{/*
+ * This file is part of docs.plexcord.club.
+ * Copyright (c) 2026 Plexcord.
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ */}
+
+# Examples
+
+Real, working Plexcord plugin examples you can copy, learn from, and build upon. Each example is complete and runnable.
+
+## Beginner Examples
+
+<Cards>
+  <Card title="Simple Notification" href="/docs/examples/simple-notification">
+    **~20 lines**: Show a notification when Discord starts. Perfect for learning the basics.
+  </Card>
+</Cards>
+
+## Intermediate Examples
+
+<Cards>
+  <Card title="Keyword Alert" href="/docs/examples/keyword-alert">
+    **~60 lines**: Watch for keywords in messages and alert you with a notification. Uses Flux events and settings.
+  </Card>
+  <Card title="Message Formatter" href="/docs/examples/message-formatter">
+    **~80 lines**: Add a chat bar button that formats your typed message. Uses ChatButtons API and commands.
+  </Card>
+</Cards>
+
+## Advanced Examples
+
+<Cards>
+  <Card title="Voice Logger" href="/docs/examples/voice-logger">
+    **~120 lines**: Log voice channel join/leave events with timestamps, persistent storage, and a settings panel.
+  </Card>
+</Cards>
+
+## How to Use These Examples
+
+1. Create a new folder in `src/userplugins/pluginName/`
+2. Copy the code into `index.ts`
+3. Run `pnpm build`
+4. Enable the plugin in Discord Settings → Plexcord → Plugins
+
+## Code Quality
+
+All examples follow these standards:
+- Full TypeScript types
+- Proper cleanup in `stop()`
+- Logger usage instead of `console.log`
+- Error handling where appropriate
+- Comments explaining non-obvious code
+
+
+# Examples
+
+Practical examples to help you understand how to use Plexcord effectively.
+
+## Basic Examples
+
+### Hello World
+
+```javascript
+// Simple Plexcord initialization
+import plexcord from 'plexcord';
+
+plexcord.on('ready', () => {
+  console.log('Plexcord is ready!');
+});
+```
+
+### Custom Theme
+
+```javascript
+// Apply a custom theme
+plexcord.themes.apply({
+  name: 'My Theme',
+  colors: {
+    primary: '#5865F2',
+    background: '#23272A',
+    text: '#FFFFFF'
+  }
+});
+```
+
+### Plugin Creation
+
+```typescript
+// Create a simple plugin
+export default {
+  name: 'hello-world',
+  version: '1.0.0',
+  
+  onLoad() {
+    console.log('Hello from plugin!');
+  },
+  
+  onUnload() {
+    console.log('Goodbye!');
+  }
+};
+```
+
+## Advanced Examples
+
+### Event Handling
+
+```typescript
+// Listen to Discord events
+plexcord.events.on('message', (message) => {
+  if (message.content.startsWith('!plexcord')) {
+    message.reply('Hello from Plexcord!');
+  }
+});
+```
+
+### Dynamic Configuration
+
+```javascript
+// Update configuration dynamically
+plexcord.config.update({
+  features: {
+    customEmojis: true,
+    enhancedNotifications: true
+  }
+});
+```
+
+## Use Cases
+
+<Cards>
+  <Card title="Theme Customization" href="/docs/examples/theme-customization">
+    Create and apply custom themes
+  </Card>
+  <Card title="Plugin Development" href="/docs/examples/plugin-development">
+    Build your own plugins
+  </Card>
+  <Card title="Automation" href="/docs/examples/automation">
+    Automate common Discord tasks
+  </Card>
+</Cards>

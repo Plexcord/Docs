@@ -1,0 +1,249 @@
+﻿---
+title: Performance
+description: Optimize Plexcord plugins for speed and low memory usage. Covers debouncing, memoization, selective Flux filtering, and DataStore efficiency.
+published: 2026-03-02
+tags: [best-practices, performance, debounce, memoization, optimization]
+---
+
+{/*
+ * This file is part of docs.plexcord.club.
+ * Copyright (c) 2026 Plexcord.
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ */}
+
+# Performance
+
+Discord is a real-time application that processes thousands of events. Poorly written plugins can cause noticeable lag, higher CPU usage, or memory leaks. These guidelines keep your plugins lean.
+
+---
+
+## Debounce High-Frequency Handlers
+
+Some Flux events fire very rapidly. **TYPING_START**, **PRESENCE_UPDATES**, and **VOICE_STATE_UPDATES** can fire dozens of times per second. Don't do expensive work synchronously in these handlers.
+
+```typescript
+import { debounce } from "@utils/debounce";
+
+// ❌ Expensive work on every single TYPING_START event
+flux: {
+    TYPING_START({ channelId }) {
+        updateTypingIndicatorUI(channelId); // Re-renders every 50ms
+    }
+}
+
+// ✅ Debounced: runs at most once per 200ms
+const updateTyping = debounce((channelId: string) => {
+    updateTypingIndicatorUI(channelId);
+}, 200);
+
+flux: {
+    TYPING_START({ channelId }) {
+        updateTyping(channelId);
+    }
+}
+```
+
+---
+
+## Filter Early in Flux Handlers
+
+Return as early as possible before doing any work. Every CPU cycle saved in a high-frequency handler adds up.
+
+```typescript
+flux: {
+    MESSAGE_CREATE({ message }) {
+        // ✅ Cheapest checks first: bail out early
+        if (!message.content) return;
+        if (message.author.bot) return;
+        if (message.guild_id !== TARGET_GUILD_ID) return;
+
+        // Only now do expensive work
+        expensiveProcessing(message);
+    }
+}
+```
+
+Order your guards cheapest-to-most-expensive:
+
+1. `null` / emptiness checks: basically free
+2. String comparisons: very fast
+3. Array lookups: fast
+4. Network calls or DataStore reads: expensive, do last
+
+---
+
+## Memoize Expensive Computations
+
+If you recompute the same result from the same inputs repeatedly, cache it.
+
+```typescript
+// ❌ Recomputes every render
+function getFormattedDisplayName(userId: string): string {
+    const user = UserStore.getUser(userId);
+    const member = MemberStore.getMember(guildId, userId);
+    return member?.nick ?? user?.username ?? userId;
+}
+
+// ✅ Cache by userId
+const displayNameCache = new Map<string, string>();
+
+function getFormattedDisplayName(userId: string): string {
+    if (displayNameCache.has(userId)) {
+        return displayNameCache.get(userId)!;
+    }
+    const user = UserStore.getUser(userId);
+    const member = MemberStore.getMember(guildId, userId);
+    const name = member?.nick ?? user?.username ?? userId;
+    displayNameCache.set(userId, name);
+    return name;
+}
+```
+
+Clear the cache when the underlying data changes:
+
+```typescript
+flux: {
+    GUILD_MEMBER_UPDATE({ user }) {
+        displayNameCache.delete(user.id); // Invalidate stale entry
+    }
+}
+```
+
+---
+
+## Don't Block the Main Thread
+
+Avoid synchronous operations that take significant time. Use `async/await` for I/O and break up loops with `setTimeout` or `sleep` if processing many items at once.
+
+```typescript
+import { sleep } from "@utils/misc";
+
+// ❌ Processes 1000 items blocking the main thread
+async function processAll(items: Item[]) {
+    for (const item of items) {
+        heavyCompute(item);
+    }
+}
+
+// ✅ Yields control after each batch
+async function processAll(items: Item[]) {
+    for (let i = 0; i < items.length; i++) {
+        heavyCompute(items[i]);
+        if (i % 50 === 0) await sleep(0); // Yield to browser
+    }
+}
+```
+
+---
+
+## Batch DataStore Writes
+
+`DataStore.set` writes to IndexedDB, which involves disk I/O. Don't call it on every single event.
+
+```typescript
+import { DataStore } from "@api/DataStore";
+import { debounce } from "@utils/debounce";
+
+let pendingHistory: LogEntry[] = [];
+
+// ❌ Writes to disk on every message
+flux: {
+    MESSAGE_CREATE({ message }) {
+        DataStore.update("MessageLog", log => [...(log ?? []), message]);
+    }
+}
+
+// ✅ Batches writes with debounce
+const flushPending = debounce(async () => {
+    if (pendingHistory.length === 0) return;
+    const batch = [...pendingHistory];
+    pendingHistory = [];
+    await DataStore.update("MessageLog", log => [...(log ?? []), ...batch]);
+}, 500);
+
+flux: {
+    MESSAGE_CREATE({ message }) {
+        pendingHistory.push(message);
+        flushPending();
+    }
+}
+```
+
+---
+
+## Cap Collection Sizes
+
+Any in-memory collection that grows unbounded is a memory leak. Always set a maximum size:
+
+```typescript
+const MAX_HISTORY = 500;
+
+async function addToHistory(entry: Entry) {
+    const history = (await DataStore.get("history")) ?? [];
+    history.push(entry);
+
+    // Trim oldest entries
+    if (history.length > MAX_HISTORY) {
+        history.splice(0, history.length - MAX_HISTORY);
+    }
+
+    await DataStore.set("history", history);
+}
+```
+
+Same applies to `Map` and `Set` used for caching:
+
+```typescript
+const MAX_CACHE = 200;
+const cache = new Map<string, string>();
+
+function setCached(key: string, value: string) {
+    if (cache.size >= MAX_CACHE) {
+        // Remove oldest entry (Maps maintain insertion order)
+        cache.delete(cache.keys().next().value);
+    }
+    cache.set(key, value);
+}
+```
+
+---
+
+## Use `startAt` Appropriately
+
+Not every plugin needs to run at the earliest possible moment. Delaying startup reduces impact on Discord's initial load:
+
+```typescript
+import { StartAt } from "@utils/types";
+
+export default definePlugin({
+    // ...
+    startAt: StartAt.DOMContentLoaded  // ✅ Wait until UI is available
+    // vs StartAt.Init (default: runs at earliest point)
+});
+```
+
+See [Plugin Lifecycle](/docs/core-concepts/plugin-lifecycle) for the full `StartAt` comparison.
+
+---
+
+<Cards>
+  <Card title="Security" href="/docs/best-practices/security">
+    Write safe plugins that protect users.
+  </Card>
+  <Card title="Code Quality" href="/docs/best-practices/code-quality">
+    TypeScript patterns and clean code guidelines.
+  </Card>
+</Cards>

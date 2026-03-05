@@ -1,0 +1,298 @@
+﻿---
+title: Voice Logger Plugin
+description: An advanced Plexcord plugin that tracks voice channel activity using DataStore for persistence. Demonstrates Flux events, DataStore, settings, and multi-event handling.
+published: 2026-03-02
+tags: [example, advanced, datastore, voice, flux, persistence, logging]
+---
+
+{/*
+ * This file is part of docs.plexcord.club.
+ * Copyright (c) 2026 Plexcord.
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ */}
+
+# Example: Voice Logger Plugin
+
+**Difficulty:** Advanced | **Concepts:** DataStore, multiple Flux events, Webpack stores, settings, async persistence
+
+This plugin logs voice channel join/leave activity and persists the history using `DataStore`. When someone you care about joins a voice channel, you get notified. All activity is stored so you can review who has been in voice channels even after restarting Discord.
+
+---
+
+## Full Source
+
+```typescript
+// File: src/plugins/voiceLogger/index.ts
+
+import definePlugin, { OptionType } from "@utils/types";
+import { definePluginSettings } from "@api/Settings";
+import { DataStore } from "@api/DataStore";
+import { showNotification } from "@api/Notifications";
+import { UserStore, GuildStore, ChannelStore } from "@webpack/common";
+import { Logger } from "@utils/Logger";
+
+const logger = new Logger("VoiceLogger");
+
+// Types
+interface VoiceEntry {
+    userId: string;
+    username: string;
+    channelId: string;
+    channelName: string;
+    guildId: string | null;
+    guildName: string | null;
+    action: "join" | "leave" | "move";
+    timestamp: number;
+}
+
+// DataStore key
+const STORE_KEY = "VoiceLogger_history";
+const MAX_HISTORY = 500;
+
+const settings = definePluginSettings({
+    notifyJoins: {
+        type: OptionType.BOOLEAN,
+        description: "Show a notification when someone joins a voice channel",
+        default: true,
+        restartNeeded: false
+    },
+    notifyLeaves: {
+        type: OptionType.BOOLEAN,
+        description: "Show a notification when someone leaves a voice channel",
+        default: false,
+        restartNeeded: false
+    },
+    watchedUsers: {
+        type: OptionType.STRING,
+        description: "Only notify for these user IDs (comma-separated). Leave blank for everyone.",
+        default: "",
+        restartNeeded: false
+    },
+    ignoreSelf: {
+        type: OptionType.BOOLEAN,
+        description: "Don't log or notify for your own voice state changes",
+        default: true,
+        restartNeeded: false
+    }
+});
+
+export default definePlugin({
+    name: "VoiceLogger",
+    description: "Logs voice channel activity and notifies you about watched users",
+    authors: [
+        {
+            name: "YourName",
+            id: 0n
+        }
+    ],
+    settings,
+
+    // Track previous voice states to detect "move" vs "join/leave"
+    previousStates: new Map<string, string>(), // userId -> channelId
+
+    start() {
+        logger.info("VoiceLogger started");
+    },
+
+    stop() {
+        this.previousStates.clear();
+        logger.info("VoiceLogger stopped");
+    },
+
+    flux: {
+        VOICE_STATE_UPDATES({ voiceStates }) {
+            if (!Array.isArray(voiceStates)) return;
+
+            for (const state of voiceStates) {
+                try {
+                    this.handleVoiceStateUpdate(state);
+                } catch (e) {
+                    logger.error("Error handling voice state update:", e);
+                }
+            }
+        }
+    },
+
+    handleVoiceStateUpdate(state: any) {
+        const { userId, channelId, guildId } = state;
+        const me = UserStore.getCurrentUser();
+
+        // Ignore self if setting enabled
+        if (settings.store.ignoreSelf && userId === me?.id) return;
+
+        const prevChannelId = this.previousStates.get(userId);
+        const action: VoiceEntry["action"] = !channelId
+            ? "leave"
+            : !prevChannelId
+                ? "join"
+                : prevChannelId !== channelId
+                    ? "move"
+                    : null as any;
+
+        // No change
+        if (!action) return;
+
+        // Update tracked state
+        if (channelId) {
+            this.previousStates.set(userId, channelId);
+        } else {
+            this.previousStates.delete(userId);
+        }
+
+        const user = UserStore.getUser(userId);
+        const channel = ChannelStore.getChannel(channelId || prevChannelId || "");
+        const guild = guildId ? GuildStore.getGuild(guildId) : null;
+
+        const entry: VoiceEntry = {
+            userId,
+            username: user?.username ?? userId,
+            channelId: channelId || prevChannelId || "",
+            channelName: channel?.name ?? "Unknown Channel",
+            guildId: guildId ?? null,
+            guildName: guild?.name ?? null,
+            action,
+            timestamp: Date.now()
+        };
+
+        // Save to DataStore (async, no await needed: fire and forget)
+        this.saveEntry(entry);
+
+        // Should we notify?
+        const watchedIds = settings.store.watchedUsers
+            .split(",")
+            .map(id => id.trim())
+            .filter(Boolean);
+
+        const shouldNotify = watchedIds.length === 0 || watchedIds.includes(userId);
+
+        if (shouldNotify) {
+            if (action === "join" && settings.store.notifyJoins) {
+                showNotification({
+                    title: `🎤 ${entry.username} joined voice`,
+                    body: `${entry.channelName}${entry.guildName ? ` · ${entry.guildName}` : ""}`,
+                    color: "#43B581"
+                });
+            } else if (action === "leave" && settings.store.notifyLeaves) {
+                showNotification({
+                    title: `🔇 ${entry.username} left voice`,
+                    body: `${entry.channelName}${entry.guildName ? ` · ${entry.guildName}` : ""}`,
+                    color: "#4F545C"
+                });
+            } else if (action === "move" && settings.store.notifyJoins) {
+                showNotification({
+                    title: `↔️ ${entry.username} moved channels`,
+                    body: `Now in: ${entry.channelName}${entry.guildName ? ` · ${entry.guildName}` : ""}`,
+                    color: "#5865F2"
+                });
+            }
+        }
+    },
+
+    async saveEntry(entry: VoiceEntry) {
+        const history: VoiceEntry[] = (await DataStore.get(STORE_KEY)) ?? [];
+        history.push(entry);
+
+        // Trim to max history size
+        if (history.length > MAX_HISTORY) {
+            history.splice(0, history.length - MAX_HISTORY);
+        }
+
+        await DataStore.set(STORE_KEY, history);
+    },
+
+    // Utility: retrieve history (can be called from DevTools)
+    async getHistory(): Promise<VoiceEntry[]> {
+        return (await DataStore.get(STORE_KEY)) ?? [];
+    },
+
+    // Utility: clear history
+    async clearHistory(): Promise<void> {
+        await DataStore.del(STORE_KEY);
+        logger.info("Voice history cleared");
+    }
+});
+```
+
+---
+
+## Key Concepts Used
+
+### `DataStore` for Persistence
+
+```typescript
+import { DataStore } from "@api/DataStore";
+
+// Read history
+const history = await DataStore.get("VoiceLogger_history") ?? [];
+
+// Write history
+await DataStore.set("VoiceLogger_history", history);
+```
+
+Data persists across Discord restarts, stored in IndexedDB. Always provide a default (`?? []`) because the key won't exist on first run.
+
+### Multiple Flux Events
+
+The `VOICE_STATE_UPDATES` event fires with an array of all changed states. Iterating with error handling per entry prevents one bad state from crashing all updates.
+
+### Tracking Previous State
+
+```typescript
+previousStates: new Map<string, string>()
+```
+
+This plugin-instance property stores each user's last known channel ID. By comparing it to the current `channelId`, we can distinguish:
+- `join`: had no previous channel, now has one
+- `leave`: had a channel, now has none (`channelId` is `null`)
+- `move`: had a channel, now has a different one
+
+### The `$self` Pattern (not used here)
+
+If this plugin needed patches, methods like `saveEntry` and `getHistory` would be accessible via `$self.saveEntry(...)` in replacement strings.
+
+---
+
+## Accessing From DevTools
+
+You can inspect stored history from the DevTools console:
+
+```javascript
+// Get all stored history
+Vencord.Plugins.plugins.VoiceLogger.getHistory().then(console.log);
+
+// Clear history
+Vencord.Plugins.plugins.VoiceLogger.clearHistory();
+```
+
+---
+
+## Improvement Ideas
+
+- Add a settings UI component (`OptionType.COMPONENT`) to display history inline
+- Export history as a CSV or JSON file
+- Filter by guild or time range
+- Add mute/unmute and deafen/undeafen tracking (use `VOICE_STATE_UPDATES` with `selfMute`, `selfDeaf` fields)
+
+---
+
+<Cards>
+  <Card title="DataStore API" href="/docs/api-reference/data-storage">
+    Full DataStore API reference.
+  </Card>
+  <Card title="Best Practices" href="/docs/best-practices">
+    Code quality, performance, and security guidelines.
+  </Card>
+</Cards>

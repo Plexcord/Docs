@@ -1,0 +1,112 @@
+﻿---
+title: Core Concepts
+description: Master the fundamental concepts of Plexcord plugin development. Plugin lifecycle, metadata, settings system, platform considerations, and debugging.
+published: 2026-03-02
+tags: [core-concepts, overview, fundamentals]
+---
+
+{/*
+ * This file is part of docs.plexcord.club.
+ * Copyright (c) 2026 Plexcord.
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ */}
+
+# Core Concepts
+
+You've written your first plugin. Now it's time to truly understand how Plexcord works under the hood. This section covers the fundamental concepts every serious plugin developer should know.
+
+## What You'll Learn
+
+<Cards>
+  <Card title="Plugin Lifecycle" href="/docs/core-concepts/plugin-lifecycle">
+    When does your plugin start? When does it stop? What happens in between? Learn the full lifecycle and how to control it.
+  </Card>
+  <Card title="Plugin Metadata" href="/docs/core-concepts/plugin-metadata">
+    Master all the metadata fields: `required`, `enabledByDefault`, `dependencies`, `tags`, and how they affect your plugin's behavior.
+  </Card>
+  <Card title="Settings Deep Dive" href="/docs/core-concepts/settings-deep-dive">
+    Go beyond the basics. Learn every `OptionType`, advanced patterns, and how the settings system works internally.
+  </Card>
+  <Card title="Platform-Specific Plugins" href="/docs/core-concepts/platform-specific">
+    Write plugins that only run on desktop, web, or Electron. Understand the `.web`, `.discordDesktop`, and `.plextron` conventions.
+  </Card>
+  <Card title="Debugging" href="/docs/core-concepts/debugging">
+    Master Plexcord's `Logger`, use DevTools effectively, and learn the most common debugging techniques.
+  </Card>
+</Cards>
+
+## Key Concepts at a Glance
+
+### Plugin Lifecycle
+Your plugin goes through a clear lifecycle:
+```
+Discord starts → Plexcord initializes → start() called → [plugin runs] → stop() called
+```
+`startAt` controls which phase triggers initialization.
+
+### Settings System
+Settings are defined once and automatically generate a settings UI:
+```typescript
+const settings = definePluginSettings({
+    option: { type: OptionType.BOOLEAN, default: true }
+});
+// Later: settings.store.option === true/false
+```
+
+### Platform Detection
+```typescript
+import { IS_DISCORD_DESKTOP, IS_WEB } from "@utils/constants";
+
+if (IS_DISCORD_DESKTOP) {
+    // Desktop-only code
+}
+```
+
+### The Logger
+```typescript
+import { Logger } from "@utils/Logger";
+const logger = new Logger("MyPlugin", "#FFD700");
+logger.info("Plugin started"); // Colorized output in DevTools
+```
+
+## Prerequisites
+
+Before diving in, make sure you've completed [Getting Started](/docs/getting-started) and built at least one simple plugin.
+
+
+# Guides
+
+Comprehensive guides to help you make the most of Plexcord.
+
+## Configuration
+
+Learn how to configure Plexcord to suit your needs.
+
+<Cards>
+  <Card title="Configuration" href="/docs/guides/configuration">
+    Complete configuration guide
+  </Card>
+  <Card title="Advanced Usage" href="/docs/guides/advanced-usage">
+    Advanced features and tips
+  </Card>
+</Cards>
+
+## Topics
+
+- Theming: Customize Discord's appearance
+- Plugins: Extend Plexcord functionality
+- Performance: Optimize for better performance
+- Troubleshooting: Common issues and solutions

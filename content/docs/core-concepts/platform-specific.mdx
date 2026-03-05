@@ -1,0 +1,263 @@
+﻿---
+title: Platform-Specific Plugins
+description: Write Plexcord plugins that run only on specific platforms. Learn the .web, .discordDesktop, and .plextron conventions and platform detection APIs.
+published: 2026-03-02
+tags: [platform, desktop, web, electron, cross-platform]
+---
+
+{/*
+ * This file is part of docs.plexcord.club.
+ * Copyright (c) 2026 Plexcord.
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ */}
+
+# Platform-Specific Plugins
+
+Discord runs in multiple environments: the desktop Electron app, the web browser, and Plextron (Plexcord's custom Electron fork). Some plugins only make sense on specific platforms, or need different behavior per platform.
+
+## The Three Platforms
+
+| Platform | Identifier | Description |
+|----------|-----------|-------------|
+| Discord Desktop | `IS_DISCORD_DESKTOP` | Official Discord desktop app (Electron) |
+| Web | `IS_WEB` | Discord in a browser (Chrome, Firefox, etc.) |
+| Plextron | `IS_PLEXTRON` | Plexcord's own Electron app |
+
+## Runtime Detection
+
+Import the platform constants from `@utils/constants`:
+
+```typescript
+import { IS_DISCORD_DESKTOP, IS_WEB, IS_PLEXTRON } from "@utils/constants";
+
+export default definePlugin({
+    name: "MyPlugin",
+    description: "Works on all platforms but does extra stuff on desktop",
+    authors: [{ name: "You", id: 0n }],
+
+    start() {
+        if (IS_DISCORD_DESKTOP) {
+            this.setupDesktopFeatures();
+        }
+
+        if (IS_WEB) {
+            this.setupWebFeatures();
+        }
+
+        if (IS_PLEXTRON) {
+            this.setupPlextronFeatures();
+        }
+    },
+
+    setupDesktopFeatures() {
+        // Access Node.js APIs, file system, etc.
+    },
+
+    setupWebFeatures() {
+        // Web-only: localStorage, service workers, etc.
+    },
+
+    setupPlextronFeatures() {
+        // Plextron-specific APIs
+    }
+});
+```
+
+## File Name Conventions
+
+Plexcord uses file naming to indicate platform support. The naming convention is:
+
+| File Name | Platform |
+|-----------|----------|
+| `index.ts` | All platforms |
+| `index.web.ts` | Web browser only |
+| `index.discordDesktop.ts` | Discord desktop only |
+| `index.plextron.ts` | Plextron only |
+
+### Example: Platform-specific entry points
+
+```
+src/plugins/myPlugin/
+├── index.ts           ← All platforms (imports the right one)
+├── index.web.ts       ← Web-specific implementation
+└── index.discordDesktop.ts  ← Desktop-specific implementation
+```
+
+The bundler automatically picks the right file for each platform at build time.
+
+## Desktop-Only Features
+
+Discord Desktop (Electron) has access to Node.js APIs that aren't available in the browser:
+
+```typescript
+import { IS_DISCORD_DESKTOP } from "@utils/constants";
+
+export default definePlugin({
+    name: "FileManager",
+    description: "Manage files (desktop only)",
+    authors: [{ name: "You", id: 0n }],
+
+    start() {
+        if (!IS_DISCORD_DESKTOP) {
+            console.warn("[FileManager] This plugin requires Discord Desktop");
+            return;
+        }
+
+        // Now safe to use desktop-only features
+        this.initFileSystem();
+    },
+
+    initFileSystem() {
+        // Access Electron's ipcRenderer, shell, etc.
+        const { ipcRenderer } = require("electron");
+        ipcRenderer.on("file-selected", this.onFileSelected.bind(this));
+    },
+
+    stop() {
+        if (!IS_DISCORD_DESKTOP) return;
+        const { ipcRenderer } = require("electron");
+        ipcRenderer.removeAllListeners("file-selected");
+    }
+});
+```
+
+### Available Desktop APIs
+
+- `electron`: Full Electron API (IPC, shell, dialog, etc.)
+- `fs`, `path`, `os`: Node.js built-in modules
+- Native file system access
+- System notifications via Electron
+- Window management
+
+## Web-Only Features
+
+When running in a browser, you have access to browser-specific APIs:
+
+```typescript
+import { IS_WEB } from "@utils/constants";
+
+export default definePlugin({
+    name: "WebClipboard",
+    description: "Enhanced clipboard for web Discord",
+    authors: [{ name: "You", id: 0n }],
+
+    start() {
+        if (!IS_WEB) return;
+        this.setupClipboardAPI();
+    },
+
+    async setupClipboardAPI() {
+        // Modern Clipboard API (browser only)
+        if ("clipboard" in navigator) {
+            console.log("[WebClipboard] Clipboard API available");
+        }
+
+        // Service Worker registration (browser only)
+        if ("serviceWorker" in navigator) {
+            // Register service worker if needed
+        }
+    }
+});
+```
+
+## Disabling a Plugin on Specific Platforms
+
+The cleanest way to create a platform-exclusive plugin is to return early in `start()`:
+
+```typescript
+import { IS_DISCORD_DESKTOP } from "@utils/constants";
+
+export default definePlugin({
+    name: "DesktopOnly",
+    description: "Only works on Discord Desktop; no-op on web",
+    authors: [{ name: "You", id: 0n }],
+
+    start() {
+        if (!IS_DISCORD_DESKTOP) return;  // Early exit on wrong platform
+
+        // All code below only runs on desktop
+        this.init();
+    },
+
+    stop() {
+        if (!IS_DISCORD_DESKTOP) return;
+        this.cleanup();
+    }
+});
+```
+
+## Cross-Platform Plugin Design
+
+### Strategy: Abstract platform differences
+
+```typescript
+import { IS_DISCORD_DESKTOP, IS_WEB } from "@utils/constants";
+
+interface StorageBackend {
+    get(key: string): Promise<string | null>;
+    set(key: string, value: string): Promise<void>;
+}
+
+// Desktop: Use Node's file system
+const desktopStorage: StorageBackend = {
+    async get(key) { /* read from file */ },
+    async set(key, value) { /* write to file */ }
+};
+
+// Web: Use localStorage
+const webStorage: StorageBackend = {
+    async get(key) { return localStorage.getItem(key); },
+    async set(key, value) { localStorage.setItem(key, value); }
+};
+
+const storage: StorageBackend = IS_DISCORD_DESKTOP ? desktopStorage : webStorage;
+
+export default definePlugin({
+    name: "CrossPlatformStorage",
+    description: "Stores data using the best method per platform",
+    authors: [{ name: "You", id: 0n }],
+
+    async start() {
+        await storage.set("lastSeen", new Date().toISOString());
+        const lastSeen = await storage.get("lastSeen");
+        console.log("[CrossPlatformStorage] Last seen:", lastSeen);
+    }
+});
+```
+
+## Platform Quick Reference
+
+```typescript
+import { IS_DISCORD_DESKTOP, IS_WEB, IS_PLEXTRON } from "@utils/constants";
+
+// Check platform
+IS_DISCORD_DESKTOP  // true on Discord's Electron app
+IS_WEB              // true in browser
+IS_PLEXTRON         // true on Plextron
+
+// Mutually exclusive: only one is true at a time
+```
+
+## Next Steps
+
+<Cards>
+  <Card title="Debugging" href="/docs/core-concepts/debugging">
+    Debug platform-specific issues using Logger and DevTools.
+  </Card>
+  <Card title="Advanced Features" href="/docs/advanced-features">
+    Learn patches, commands, and events for powerful plugins.
+  </Card>
+</Cards>

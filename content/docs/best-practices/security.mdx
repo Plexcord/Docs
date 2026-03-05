@@ -1,0 +1,250 @@
+﻿---
+title: Security
+description: Write safe Plexcord plugins. Prevent XSS, validate user input, protect tokens, handle API errors, and avoid common vulnerabilities.
+published: 2026-03-02
+tags: [best-practices, security, XSS, validation, tokens, safety]
+---
+
+{/*
+ * This file is part of docs.plexcord.club.
+ * Copyright (c) 2026 Plexcord.
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ */}
+
+# Security
+
+Plugin security matters. A vulnerable plugin runs in Discord's renderer process with access to the user's account, messages, and personal data. These guidelines prevent common security pitfalls.
+
+---
+
+## Never Use `innerHTML` with User Data
+
+This is the most common vulnerability. Inserting user-controlled strings as HTML creates XSS opportunities:
+
+```typescript
+// ❌ DANGEROUS: message.content could contain <script>alert(1)</script>
+element.innerHTML = `<div>${message.content}</div>`;
+
+// ✅ Safe: text only, no HTML interpretation
+element.textContent = message.content;
+
+// ✅ Also safe via React
+<div>{message.content}</div>          // React auto-escapes
+<div dangerouslySetInnerHTML=... />   // ❌ Never use this with user data
+```
+
+### Safe alternatives
+
+```typescript
+// Create elements programmatically
+const div = document.createElement("div");
+div.textContent = userInput;  // Safe: treated as text, not HTML
+parent.appendChild(div);
+
+// Or build React elements
+const content = React.createElement("span", null, userInput);
+```
+
+---
+
+## Validate All User Inputs
+
+Settings values come from the user directly. Never trust them without validation:
+
+```typescript
+// ❌ Unsafe: trusts the setting blindly
+const limit = settings.store.maxItems;
+const items = array.slice(0, limit);  // Could be NaN, negative, or Infinity
+
+// ✅ Safe: validates and clamps
+const rawLimit = settings.store.maxItems;
+const limit = Number.isInteger(rawLimit) && rawLimit > 0
+    ? Math.min(rawLimit, 1000)   // Cap at reasonable max
+    : 10;                         // Fallback default
+const items = array.slice(0, limit);
+```
+
+```typescript
+// ❌ Unsafe: URL setting passed directly to fetch
+await fetch(settings.store.webhookUrl);
+
+// ✅ Validate URL format and scheme first
+function isValidHttpsUrl(url: string): boolean {
+    try {
+        const u = new URL(url);
+        return u.protocol === "https:";
+    } catch {
+        return false;
+    }
+}
+
+if (isValidHttpsUrl(settings.store.webhookUrl)) {
+    await fetch(settings.store.webhookUrl);
+} else {
+    logger.warn("Invalid webhook URL:", settings.store.webhookUrl);
+}
+```
+
+---
+
+## Never Log or Store Tokens
+
+The user's Discord token grants full account access. Never touch it:
+
+```typescript
+// ❌ Extremely dangerous
+const token = TokenModule.getToken();
+await DataStore.set("token", token);
+logger.info("Token:", token);
+
+// ✅ Never interact with auth tokens
+// If you need to make API calls, use the built-in RestAPI
+import { RestAPI } from "@webpack/common";
+await RestAPI.get({ url: "/users/@me" });  // Token is handled internally
+```
+
+<Callout type="error">
+Storing, logging, or transmitting the user's token is a **bannable offense** and a serious security vulnerability. Plexcord's review process will reject any plugin that touches tokens.
+</Callout>
+
+---
+
+## Handle API Errors Gracefully
+
+Network calls fail. Always handle `RestAPI` rejections:
+
+```typescript
+// ❌ Unhandled: a 429 rate limit or 403 will crash the plugin
+const response = await RestAPI.get({ url: `/channels/${channelId}` });
+processData(response.body);
+
+// ✅ Handle errors explicitly
+try {
+    const response = await RestAPI.get({ url: `/channels/${channelId}` });
+    if (response.ok) {
+        processData(response.body);
+    } else {
+        logger.warn(`API returned ${response.status} for channel ${channelId}`);
+    }
+} catch (e) {
+    logger.error("API request failed:", e);
+}
+```
+
+---
+
+## Don't Expose Private User Data
+
+Be careful what your plugin logs or sends elsewhere:
+
+```typescript
+// ❌ Leaks private message content to the console
+logger.info("Processing message:", message);  // Contains content, author, etc.
+
+// ✅ Log only what's needed for debugging
+logger.debug("Processing message ID:", message.id, "in channel:", message.channel_id);
+```
+
+If your plugin sends data to an external service (webhook, analytics, etc.), be explicit in the plugin description and make it opt-in.
+
+---
+
+## Validate DataStore Data on Read
+
+Data in `DataStore` could be stale or malformed from an older plugin version:
+
+```typescript
+interface SavedEntry {
+    id: string;
+    value: number;
+    createdAt: number;
+}
+
+async function loadEntries(): Promise<SavedEntry[]> {
+    const raw = await DataStore.get("MyPlugin_entries");
+
+    // ❌ No validation: crashes if data is wrong type
+    return raw;
+
+    // ✅ Validate structure before use
+    if (!Array.isArray(raw)) return [];
+
+    return raw.filter((item): item is SavedEntry =>
+        typeof item?.id === "string" &&
+        typeof item?.value === "number" &&
+        typeof item?.createdAt === "number"
+    );
+}
+```
+
+---
+
+## Patch Safety
+
+The patch system modifies Discord's source code directly. Follow these rules:
+
+| Rule | Why |
+|------|-----|
+| Use very specific `find` strings | Avoid patching the wrong module |
+| Test in DevTools before shipping | Confirm match is unique |
+| Use `predicate` to limit scope | Only apply when needed |
+| Keep replacements minimal | Smaller changes break less |
+| Handle patched code throwing | Wrap patched calls in try/catch |
+
+```typescript
+patches: [{
+    find: "very.specific.unique.string.in.module",
+    replacement: {
+        match: /exactPattern\((\i)\)/,
+        replace: "($self.safeWrapper($1) ?? exactPattern($1))"
+    }
+}],
+
+safeWrapper(arg: any) {
+    try {
+        return myTransform(arg);
+    } catch (e) {
+        logger.error("Transform failed, falling back:", e);
+        return null; // Fallback to original behavior
+    }
+}
+```
+
+---
+
+## Security Checklist
+
+Before publishing your plugin, verify:
+
+- [ ] No `innerHTML` with user-controlled strings
+- [ ] All settings values validated before use
+- [ ] No token access (`TokenModule.getToken()` never called)
+- [ ] All `RestAPI` calls wrapped in try/catch
+- [ ] No sensitive data logged (message content, user IDs when not needed, etc.)
+- [ ] DataStore reads validated before use
+- [ ] External requests are optional and documented
+- [ ] Patches use specific `find` strings
+
+---
+
+<Cards>
+  <Card title="Code Quality" href="/docs/best-practices/code-quality">
+    TypeScript patterns and clean code guidelines.
+  </Card>
+  <Card title="Performance" href="/docs/best-practices/performance">
+    Optimize for speed and low memory usage.
+  </Card>
+</Cards>

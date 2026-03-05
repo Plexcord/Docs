@@ -1,0 +1,151 @@
+﻿---
+title: Next Steps
+description: You've built your first plugin. Now explore Core Concepts, Advanced Features, and the Plexcord API to level up your skills.
+published: 2026-03-02
+tags: [next-steps, learning-path, resources]
+---
+
+{/*
+ * This file is part of docs.plexcord.club.
+ * Copyright (c) 2026 Plexcord.
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ */}
+
+import { BookOpen, Zap, BookMarked, MessageCircle, Bug, Github, GitPullRequest, Rocket } from 'lucide-react';
+
+# Next Steps
+
+You've built your first Plexcord plugin and learned the fundamentals. Here's where to go next depending on your goals.
+
+## Learning Path
+
+### <BookOpen className="inline mr-2" size={20} /> Level Up Your Knowledge
+
+If you want to understand *how* plugins work under the hood, continue with Core Concepts:
+
+<Cards>
+  <Card title="Plugin Lifecycle" href="/docs/core-concepts/plugin-lifecycle">
+    Understand exactly when `start()`, `stop()`, and `startAt` run, and why it matters.
+  </Card>
+  <Card title="Plugin Metadata" href="/docs/core-concepts/plugin-metadata">
+    Master all the metadata fields: `required`, `enabledByDefault`, `dependencies`, and `tags`.
+  </Card>
+  <Card title="Settings Deep Dive" href="/docs/core-concepts/settings-deep-dive">
+    Learn every `OptionType` in detail: `MULTISELECT`, `BIGINT`, `CUSTOM`, and more.
+  </Card>
+  <Card title="Debugging" href="/docs/core-concepts/debugging">
+    Use Plexcord's `Logger`, DevTools, and error boundaries to squash bugs fast.
+  </Card>
+</Cards>
+
+### <Zap className="inline mr-2" size={20} /> Build Powerful Features
+
+Once you understand the basics, learn the powerful capabilities that make Plexcord plugins unique:
+
+<Cards>
+  <Card title="Patches System" href="/docs/advanced-features/patches">
+    Modify Discord's internal code at runtime using regex-based patching.
+  </Card>
+  <Card title="Commands System" href="/docs/advanced-features/commands">
+    Create custom Discord slash commands with options, autocomplete, and responses.
+  </Card>
+  <Card title="Flux Events" href="/docs/advanced-features/flux-events">
+    React to Discord events like `MESSAGE_CREATE`, `GUILD_MEMBER_UPDATE`, and hundreds more.
+  </Card>
+  <Card title="Context Menus" href="/docs/advanced-features/context-menus">
+    Add items to right-click menus on users, messages, and channels.
+  </Card>
+</Cards>
+
+### <BookMarked className="inline mr-2" size={20} /> Reference & Examples
+
+Need a quick answer or a full working example?
+
+<Cards>
+  <Card title="API Reference" href="/docs/api-reference">
+    Complete TypeScript interfaces for every Plexcord API.
+  </Card>
+  <Card title="Examples" href="/docs/examples">
+    Copy-paste working plugin examples from beginner to advanced complexity.
+  </Card>
+  <Card title="Best Practices" href="/docs/best-practices">
+    Write clean, performant, secure plugins used in production.
+  </Card>
+</Cards>
+
+## Quick Reference
+
+### Most Used Imports
+
+```typescript
+// Core
+import definePlugin, { OptionType } from "@utils/types";
+import { definePluginSettings } from "@api/Settings";
+
+// Logging
+import { Logger } from "@utils/Logger";
+
+// Notifications
+import { showNotification } from "@api/Notifications";
+
+// Discord modules (Webpack)
+import { UserStore, ChannelStore } from "@webpack/common";
+
+// React
+import { React, useState, useEffect } from "@webpack/common";
+```
+
+### Most Used Patterns
+
+**Reading user settings:**
+```typescript
+const userId = UserStore.getCurrentUser()?.id;
+```
+
+**Getting current channel:**
+```typescript
+const channelId = SelectedChannelStore.getChannelId();
+```
+
+**Conditionally running in start():**
+```typescript
+start() {
+    if (!IS_DISCORD_DESKTOP) return;  // Desktop only
+    // ... your code
+},
+```
+
+**Flux with multiple events:**
+```typescript
+flux: {
+    MESSAGE_CREATE({ message }) { ... },
+    MESSAGE_UPDATE({ message }) { ... },
+    MESSAGE_DELETE({ id }) { ... },
+},
+```
+
+## Getting Help
+
+- <MessageCircle className="inline mr-2" size={16} /> **Discord Server**: Join the [Plexcord Discord](https://plexcord.club/discord) in the `#plugin-development` channel
+- <Bug className="inline mr-2" size={16} /> **Bug Reports**: [Open an issue](https://github.com/MutanPlex/Plexcord/issues) on GitHub
+- <Github className="inline mr-2" size={16} /> **Source Code**: Browse [existing plugins](https://github.com/MutanPlex/Plexcord/tree/main/src/plugins) for real-world examples
+- <GitPullRequest className="inline mr-2" size={16} /> **Contributing**: See `CONTRIBUTING.md` in the repository
+
+## You're Ready!
+
+With the Getting Started knowledge you have now, you can build most plugins. Explore the rest of the docs whenever you need a specific capability.
+
+Happy hacking! <Rocket className="inline ml-1" size={18} />

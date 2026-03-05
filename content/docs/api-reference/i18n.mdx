@@ -1,0 +1,421 @@
+﻿---
+title: Internationalization (i18n)
+description: Make your plugin speak every language. Full reference for Plexcord's dual i18n system, covering the renderer API and main process.
+published: 2026-03-05
+tags: [i18n, localization, translation, multi-language, api]
+---
+
+{/*
+ * This file is part of docs.plexcord.club.
+ * Copyright (c) 2026 Plexcord.
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ */}
+
+# Internationalization (i18n)
+
+Plexcord has a first-class, fully typed localization system that lets your plugin display text in the user's language. All user-facing strings in both the renderer and the Electron main process are translatable.
+
+## Two i18n Systems
+
+Plexcord runs code in two separate environments, each with its own i18n instance:
+
+| | Renderer (`@api/i18n`) | Main Process (`src/main/utils/i18n`) |
+|---|---|---|
+| **When it runs** | After Discord's webpack is ready | Before Discord's window opens |
+| **Used for** | Plugin UI, settings labels, notifications, JSX | Tray menu, native IPC messages, system dialogs |
+| **Locale source** | `FluxDispatcher` + `UserSettingsStore` | `RendererSettings` (JSON file on disk) |
+| **Storage** | `localStorage` / `Settings` API | Settings file via `RendererSettings` |
+| **Export** | `import { t } from "@api/i18n"` | `import { t } from "../../main/utils/i18n"` |
+| **React support** | Yes (JSX interpolation, hooks) | No (Node.js only) |
+
+Both systems share the same locale files under `src/locales/` and the same proxy-based key access API.
+
+---
+
+## Renderer i18n (`@api/i18n`)
+
+This is what plugin developers use for all UI-facing strings.
+
+### Basic Usage
+
+```typescript
+import { t, plugin } from "@api/i18n";
+
+export default definePlugin({
+    name: "MyPlugin",
+    description: () => t(plugin.myPlugin.description),
+
+    start() {
+        showNotification({
+            title: t(plugin.myPlugin.notif.title),
+            body: t(plugin.myPlugin.notif.body),
+        });
+    }
+});
+```
+
+### The `t()` Function
+
+```typescript
+import { t } from "@api/i18n";
+
+t(key)                    // simple string lookup
+t(key, { name: "Alice" }) // with interpolation: uses {{name}} in the locale string
+```
+
+`t()` returns `string` by default. When you pass JSX elements as params, it returns a `React.ReactNode` (see [JSX Interpolation](#jsx-interpolation) below).
+
+### Key Access: Proxy System (Recommended)
+
+Instead of error-prone string literals, Plexcord exposes every translation key as a **typed proxy**. Accessing a key through the proxy gives you:
+
+- Full **IntelliSense autocomplete** in your IDE
+- **Compile-time type safety**: typos are caught by TypeScript
+- **Refactor safety**: renaming a key in `en.ts` propagates everywhere
+
+```typescript
+// ✅ Recommended: proxy access
+import { t, plugin } from "@api/i18n";
+t(plugin.myPlugin.label)         // → string "myPlugin.label" used as key
+
+// ❌ Avoid: string literals, no type safety
+t("plugin.myPlugin.label" as any)
+```
+
+The available namespace proxies exported from `@api/i18n`:
+
+| Proxy | Namespace | Contents |
+|---|---|---|
+| `plugin` | `plugin.*` | Per-plugin strings (your plugin lives here) |
+| `settings` | `settings.*` | Plexcord settings UI |
+| `common` | `common.*` | Shared common strings |
+| `components` | `components.*` | Reusable component strings |
+| `notifications` | `notifications.*` | Notification system strings |
+| `commands` | `commands.*` | Commands API strings |
+| `updater` | `updater.*` | Updater strings |
+| `cloud` | `cloud.*` | Cloud sync strings |
+| `themes` | `themes.*` | Theme manager strings |
+
+### Lazy Evaluation: Always Use Functions
+
+Translation keys are resolved **at render time**, not at module load time, because the locale might not be loaded yet when your plugin file is first parsed. Always wrap `t()` calls in functions when used in `definePlugin`:
+
+```typescript
+// ✅ Correct: lazy, evaluated when the UI renders
+export default definePlugin({
+    name: "MyPlugin",
+    description: () => t(plugin.myPlugin.description),
+    settings: definePluginSettings({
+        someOption: {
+            label: () => t(plugin.myPlugin.optionLabel),
+            description: () => t(plugin.myPlugin.optionDesc),
+            type: OptionType.BOOLEAN,
+            default: true
+        }
+    })
+});
+
+// ❌ Wrong: evaluated at module load, locale may not be ready
+export default definePlugin({
+    name: "MyPlugin",
+    description: t(plugin.myPlugin.description),  // may return undefined!
+});
+```
+
+Exception: inside `start()`, `flux` handlers, and other runtime code. `t()` can be called directly since they only run after locale loading is complete.
+
+### JSX Interpolation
+
+When a translation string contains a placeholder that you want to fill with a React element, pass it as a param. `t()` will return a `React.ReactNode`:
+
+```typescript
+import { t, plugin } from "@api/i18n";
+
+// Locale string: "View the {{link}} for details"
+function MyComponent() {
+    return (
+        <p>
+            {t(plugin.myPlugin.viewDocs, {
+                link: <a href="https://example.com">documentation</a>
+            })}
+        </p>
+    );
+}
+```
+
+The rendered output: `View the <a href="...">documentation</a> for details`
+
+For plain string interpolation:
+
+```typescript
+// Locale string: "Welcome back, {{name}}!"
+t(plugin.myPlugin.welcome, { name: currentUser.username })
+// → "Welcome back, Alice!"
+```
+
+### React Hooks
+
+For components that need to re-render when the user changes their language:
+
+```typescript
+import { useTranslation, useLocale } from "@api/i18n";
+
+// Full hook: get t(), locale, setLocale and re-renders on change
+function MySettingsPanel() {
+    const { t, locale } = useTranslation();
+    return <div>{t(plugin.myPlugin.panelTitle)}</div>;
+}
+
+// Lightweight: just the current locale string
+function MyComponent() {
+    const locale = useLocale(); // re-renders on locale change
+    return <div>Current language: {locale}</div>;
+}
+```
+
+Higher-order component for class-based or legacy components:
+
+```typescript
+import { withI18n } from "@api/i18n";
+
+const LocalizedComponent = withI18n(MyComponent);
+```
+
+### Supported Languages
+
+Plexcord ships locale files for all Discord-supported languages and more:
+
+| Code | Language |
+|---|---|
+| `en-US` | English (US) |
+| `en-GB` | English (UK) |
+| `tr` | Turkish (Türkçe) |
+| `de` | German (Deutsch) |
+| `fr` | French (Français) |
+| `es-ES` | Spanish, Spain (Español) |
+| `es-419` | Spanish, Latin America (Español) |
+| `pt-BR` | Portuguese, Brazil (Português) |
+| `pt-PT` | Portuguese, Portugal (Português) |
+| `ru` | Russian (Русский) |
+| `uk` | Ukrainian (Українська) |
+| `pl` | Polish (Polski) |
+| `cs` | Czech (Čeština) |
+| `sk` | Slovak (Slovenčina) |
+| `hr` | Croatian (Hrvatski) |
+| `sr` | Serbian (Српски) |
+| `bg` | Bulgarian (Български) |
+| `ro` | Romanian (Română) |
+| `hu` | Hungarian (Magyar) |
+| `lt` | Lithuanian (Lietuvių) |
+| `el` | Greek (Ελληνικά) |
+| `he` | Hebrew (עברית) |
+| `hi` | Hindi (हिन्दी) |
+| `th` | Thai (ไทย) |
+| `vi` | Vietnamese (Tiếng Việt) |
+| `zh-CN` | Chinese, Simplified (中文) |
+| `zh-TW` | Chinese, Traditional (繁體中文) |
+| `ja` | Japanese (日本語) |
+| `ko` | Korean (한국어) |
+| `da` | Danish (Dansk) |
+| `sv-SE` | Swedish (Svenska) |
+| `nb` | Norwegian Bokmål (Norsk) |
+| `fi` | Finnish (Suomi) |
+| `nl` | Dutch (Nederlands) |
+| `it` | Italian (Italiano) |
+
+Each language has a corresponding file in `src/locales/` (e.g. `de.ts`, `fr.ts`, `ja.ts`). All are typed as `MatchStructure<typeof enTranslations>` to ensure structural parity with the English source.
+
+To check which languages are available at runtime:
+
+```typescript
+import { SUPPORTED_LANGUAGES } from "@api/i18n";
+// Record<string, { name: string; nativeName: string; code: string; direction: "ltr" | "rtl" }>
+```
+
+---
+
+## Main Process i18n
+
+<Callout type="info">
+This is for code running in `src/main/`, specifically the Electron main process. If you're writing a standard plugin in `src/plugins/`, use `@api/i18n` instead.
+</Callout>
+
+The main process i18n system starts **before Discord's window opens**, reading locale settings from the filesystem. It's used for:
+
+- Tray menu labels
+- Native IPC error and status messages
+- System-level dialogs
+- Any Node.js-side string that users will see
+
+### Usage
+
+```typescript
+// In src/main/*.ts files
+import { t, plugin } from "../../main/utils/i18n";
+
+ipcMain.handle(IpcEvents.MY_EVENT, async () => {
+    if (error) {
+        return { error: t(plugin.myPlugin.ipcError) };
+    }
+});
+```
+
+The API is identical to the renderer's `t()`: same proxy access, same interpolation syntax. The only difference is no JSX support (Node.js environment) and no React hooks.
+
+---
+
+## Adding Translations to Your Plugin
+
+All plugin translations live in the shared locale files under the `plugin` namespace. Each plugin gets its own sub-object keyed by the exact plugin name.
+
+### Step 1: Add your strings to `en.ts`
+
+Open `src/locales/en.ts` and add your plugin's strings under `translations.plugin`:
+
+```typescript
+// src/locales/en.ts
+const translations = {
+    // ... other namespaces
+    plugin: {
+        // ... other plugins
+        myPlugin: {
+            description: "Does something useful",
+            notif: {
+                title: "MyPlugin",
+                body: "Plugin is now active!"
+            },
+            settings: {
+                featureLabel: "Enable feature",
+                featureDesc: "Toggles the main feature on or off"
+            },
+            ipcError: "Failed to complete the operation"
+        }
+    }
+} as const;
+```
+
+### Step 2: Add translations to the locale files
+
+Each supported language has its own file in `src/locales/` (e.g. `tr.ts`, `de.ts`, `fr.ts`, `ja.ts`). Every locale file is typed as `MatchStructure<typeof enTranslations>`. TypeScript will give you a compile error if any key is missing.
+
+Add your plugin's strings to **every locale file** you want to support. At minimum, add English (`en.ts`). Users whose language isn't translated will automatically see the English fallback.
+
+```typescript
+// src/locales/tr.ts  (Turkish)
+const translations: MatchStructure<typeof enTranslations> = {
+    plugin: {
+        myPlugin: {
+            description: "Yararlı bir şey yapar",
+            notif: {
+                title: "MyPlugin",
+                body: "Eklenti artık aktif!"
+            },
+            settings: {
+                featureLabel: "Özelliği etkinleştir",
+                featureDesc: "Ana özelliği açar veya kapatır"
+            },
+            ipcError: "İşlem tamamlanamadı"
+        }
+    }
+};
+
+// src/locales/de.ts  (German)
+const translations: MatchStructure<typeof enTranslations> = {
+    plugin: {
+        myPlugin: {
+            description: "Macht etwas Nützliches",
+            notif: {
+                title: "MyPlugin",
+                body: "Plugin ist jetzt aktiv!"
+            },
+            settings: {
+                featureLabel: "Funktion aktivieren",
+                featureDesc: "Schaltet die Hauptfunktion ein oder aus"
+            },
+            ipcError: "Vorgang konnte nicht abgeschlossen werden"
+        }
+    }
+};
+```
+
+The TypeScript compiler will alert you if a locale file is missing any key that exists in `en.ts`, so you can never ship an incomplete translation by accident. If your language isn't listed in `src/locales/`, English will be used as fallback automatically.
+
+### Step 3: Use the keys in your plugin
+
+```typescript
+import { t, plugin } from "@api/i18n";
+
+export default definePlugin({
+    name: "MyPlugin",
+    description: () => t(plugin.myPlugin.description),
+    settings: definePluginSettings({
+        feature: {
+            label: () => t(plugin.myPlugin.settings.featureLabel),
+            description: () => t(plugin.myPlugin.settings.featureDesc),
+            type: OptionType.BOOLEAN,
+            default: true
+        }
+    }),
+
+    start() {
+        showNotification({
+            title: t(plugin.myPlugin.notif.title),
+            body: t(plugin.myPlugin.notif.body)
+        });
+    }
+});
+```
+
+---
+
+## IPC Sync Between Renderer and Main
+
+When a user changes their language in Discord settings, both i18n systems stay in sync automatically:
+
+1. Renderer detects locale change via `FluxDispatcher` → `USER_SETTINGS_UPDATE`
+2. `src/api/i18n.ts` calls `PlexcordNative.i18n.updateMainLocale(newLocale)`
+3. An IPC message (`IpcEvents.UPDATE_MAIN_LOCALE`) is sent to the main process
+4. `src/main/utils/i18n.ts` receives it and reloads its translations
+
+You don't need to handle this yourself; it's automatic.
+
+---
+
+## Quick Reference
+
+```typescript
+// Import
+import { t, plugin, common, useTranslation } from "@api/i18n";
+
+// Simple lookup
+t(plugin.myPlugin.label)
+
+// With string interpolation
+t(plugin.myPlugin.greeting, { name: "Alice" })
+
+// With JSX interpolation (returns React.ReactNode)
+t(plugin.myPlugin.viewDocs, { link: <a href="...">docs</a> })
+
+// In definePlugin (always wrap in functions)
+description: () => t(plugin.myPlugin.description)
+label: () => t(plugin.myPlugin.settings.someOption.label)
+
+// In runtime code (start, stop, flux handlers: no wrapper needed)
+start() { showNotification({ body: t(plugin.myPlugin.notif.body) }); }
+
+// React hook for components
+const { t } = useTranslation();
+```

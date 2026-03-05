@@ -1,0 +1,290 @@
+﻿---
+title: Debugging
+description: Debug Plexcord plugins using the Logger utility, Chrome DevTools, error boundaries, and common debugging techniques.
+published: 2026-03-02
+tags: [debugging, Logger, DevTools, errors, development]
+---
+
+{/*
+ * This file is part of docs.plexcord.club.
+ * Copyright (c) 2026 Plexcord.
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ */}
+
+# Debugging
+
+Good debugging skills are the difference between spending 5 minutes and 5 hours fixing a bug. This guide covers Plexcord's built-in debugging tools and effective techniques.
+
+## The Logger
+
+Plexcord provides a `Logger` class that outputs colorized, prefixed messages to the DevTools console. Always use this instead of plain `console.log`.
+
+### Creating a Logger
+
+```typescript
+import { Logger } from "@utils/Logger";
+
+// Create a logger for your plugin
+// Parameters: name (shown as prefix), optional color (hex)
+const logger = new Logger("MyPlugin", "#FFD700");
+```
+
+### Logger Methods
+
+```typescript
+logger.log("Basic message");           // Gray prefix
+logger.info("Informational message");  // Blue prefix
+logger.warn("Warning message");        // Yellow prefix  ⚠️
+logger.error("Error message");         // Red prefix     ❌
+logger.debug("Debug message");         // Only shown with debug mode on
+```
+
+### Logging Values
+
+```typescript
+// Log objects (they're inspectable in DevTools)
+logger.log("Plugin state:", { count: 5, active: true });
+
+// Log arrays
+logger.info("Loaded items:", [1, 2, 3, 4, 5]);
+
+// Log errors with stack traces
+try {
+    doSomethingRisky();
+} catch (e) {
+    logger.error("Failed to do risky thing:", e);
+}
+```
+
+### Logger in Practice
+
+```typescript
+import definePlugin from "@utils/types";
+import { Logger } from "@utils/Logger";
+
+const logger = new Logger("KeywordTracker", "#FF6B6B");
+
+export default definePlugin({
+    name: "KeywordTracker",
+    description: "...",
+    authors: [{ name: "You", id: 0n }],
+
+    start() {
+        logger.info("Plugin starting up");
+        logger.log("Settings loaded:", settings.store);
+    },
+
+    stop() {
+        logger.info("Plugin shutting down");
+    },
+
+    flux: {
+        MESSAGE_CREATE({ message }) {
+            logger.debug("Processing message:", message.id);
+        }
+    }
+});
+```
+
+## Opening DevTools in Discord
+
+To access the browser console in Discord:
+
+| Platform | Shortcut |
+|----------|----------|
+| Windows / Linux | `Ctrl + Shift + I` |
+| macOS | `Cmd + Option + I` |
+| Alternative | Right-click → "Inspect Element" |
+
+<Callout type="info">
+  If DevTools doesn't open, enable it first: **Settings → Plexcord → Enable DevTools**. On some builds, you may need to run Discord with `--enable-devtools` flag.
+</Callout>
+
+## Filtering Console Output
+
+In DevTools Console:
+- Type your plugin name in the filter box (e.g., `MyPlugin`) to see only your logs
+- Use log levels: click on the level dropdown to filter by Info/Warn/Error
+- Enable "Verbose" to see debug-level logs
+
+## Common Debugging Scenarios
+
+### Plugin Not Appearing in Settings
+
+1. Check for TypeScript errors: `pnpm tsc --noEmit`
+2. Verify the file is at the correct path (`src/plugins/` or `src/userplugins/`)
+3. Make sure it exports `export default definePlugin({...})`
+4. Check for syntax errors: a single bad bracket stops the whole file from loading
+
+### `start()` Not Running
+
+Open DevTools and check for:
+
+```javascript
+// In DevTools console, check if plugin loaded:
+Vencord.Plugins.plugins.MyPlugin
+// Should show your plugin object, not undefined
+```
+
+If it's `undefined`, your plugin failed to load. Look for red error messages around the "Plexcord" prefix.
+
+### Settings Not Saving
+
+```typescript
+// Bad: assigning to a nested object directly
+settings.store.nested.value = "new";  // ❌ Won't trigger save
+
+// Good: assign directly to store properties
+settings.store.myValue = "new";  // ✅ Triggers save
+```
+
+### Flux Events Not Firing
+
+Test if the event fires at all:
+
+```typescript
+// Add this temporarily to your plugin:
+start() {
+    const { FluxDispatcher } = Vencord.Webpack.Common;
+
+    FluxDispatcher.register(action => {
+        if (action.type === "MESSAGE_CREATE") {
+            logger.log("Flux event received!", action);
+        }
+    });
+},
+```
+
+If you see the log, the event fires but your `flux:` handler might have an issue. If you don't, the event name might be wrong.
+
+### Patches Not Working
+
+Use the patch debugger in DevTools console:
+
+```javascript
+// Find the module your patch targets
+Vencord.Webpack.findAll(m => m.toString?.().includes("yourSearchString"))
+```
+
+If this returns an empty array, the string you're searching for doesn't exist in the loaded modules. Check your `find` value.
+
+## Inspecting Discord's Webpack Modules
+
+Plexcord exposes Webpack tools in DevTools:
+
+```javascript
+// Find any module by content
+Vencord.Webpack.find(m => m.MessageStore)
+
+// Find all matching modules
+Vencord.Webpack.findAll(m => m?.default?.displayName === "Message")
+
+// Get common modules
+Vencord.Webpack.Common.UserStore.getCurrentUser()
+Vencord.Webpack.Common.ChannelStore.getChannel("12345")
+```
+
+These are invaluable for understanding what data is available to your plugin.
+
+## Accessing Plugin State in DevTools
+
+```javascript
+// Access your plugin object
+const plugin = Vencord.Plugins.plugins.MyPlugin;
+
+// Check settings
+plugin.settings.store
+
+// Call plugin methods
+plugin.start()
+plugin.stop()
+```
+
+## Error Boundaries for React Components
+
+If your plugin renders React components in Discord's UI, wrap them in error boundaries to prevent crashes from breaking Discord:
+
+```typescript
+import ErrorBoundary from "@components/ErrorBoundary";
+
+function MyComponent() {
+    return (
+        <ErrorBoundary
+            noop          // Silent fallback (renders nothing on error)
+            // fallback={<div>Component failed to render</div>}
+        >
+            <MyActualComponent />
+        </ErrorBoundary>
+    );
+}
+```
+
+## Debug Build vs. Release Build
+
+When you run `pnpm build --watch` (watch mode), each file change triggers a rebuild. Full reloads apply the changes:
+
+```bash
+# Run in watch mode: rebuilds on file save
+pnpm build --watch
+```
+
+In Discord with DevTools open (`Ctrl+Shift+R` to hard reload):
+1. Save your plugin file
+2. Wait for watch build to finish
+3. Hard reload Discord via DevTools: `Ctrl+Shift+R`
+
+## Useful DevTools Console Snippets
+
+```javascript
+// List all loaded plugins
+Object.keys(Vencord.Plugins.plugins)
+
+// Check if a specific plugin is enabled
+Vencord.Plugins.isPluginEnabled("MyPlugin")
+
+// Manually trigger plugin start/stop for testing
+Vencord.Plugins.plugins.MyPlugin.start()
+
+// Inspect raw settings storage
+Vencord.Settings.plugins.MyPlugin
+
+// Check Plexcord version
+Vencord.Build.VERSION
+```
+
+## Debugging Checklist
+
+When something isn't working, go through this checklist:
+
+- [ ] TypeScript compiles without errors (`pnpm tsc --noEmit`)
+- [ ] Plugin appears in `Vencord.Plugins.plugins`
+- [ ] Plugin is enabled in Discord settings
+- [ ] No red errors in DevTools console
+- [ ] Correct event name in `flux:` handler
+- [ ] `start()` runs (add `logger.info("started")`)
+- [ ] Settings have the expected values (`logger.log(settings.store)`)
+- [ ] Patches find their target (`Vencord.Webpack.findAll(...)`)
+
+## Next Steps
+
+<Cards>
+  <Card title="Advanced Features" href="/docs/advanced-features">
+    Learn patches, commands, and Flux events.
+  </Card>
+  <Card title="Examples" href="/docs/examples">
+    See complete working examples to learn from.
+  </Card>
+</Cards>

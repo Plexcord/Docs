@@ -1,0 +1,12 @@
+{
+  "title": "Core Concepts",
+  "icon": "BookOpen",
+  "pages": [
+    "index",
+    "plugin-lifecycle",
+    "plugin-metadata",
+    "settings-deep-dive",
+    "platform-specific",
+    "debugging"
+  ]
+}

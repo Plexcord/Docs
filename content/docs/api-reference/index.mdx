@@ -1,0 +1,133 @@
+﻿---
+title: API Reference
+description: Complete TypeScript API reference for Plexcord plugin development. Core APIs, DataStore, Notifications, Logger, and Webpack utilities.
+published: 2026-03-02
+tags: [api, reference, typescript, interfaces]
+---
+
+{/*
+ * This file is part of docs.plexcord.club.
+ * Copyright (c) 2026 Plexcord.
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ */}
+
+# API Reference
+
+Complete reference documentation for all Plexcord APIs. Each page covers TypeScript interfaces, function signatures, and usage examples.
+
+## API Categories
+
+<Cards>
+  <Card title="Core APIs" href="/docs/api-reference/core-apis">
+    `definePlugin`, `definePluginSettings`, and `StartAt`. The foundation of every plugin.
+  </Card>
+  <Card title="Data & Storage" href="/docs/api-reference/data-storage">
+    `DataStore` API for persistent key-value storage across Discord sessions.
+  </Card>
+  <Card title="Notifications" href="/docs/api-reference/notifications">
+    `showNotification`, `showToast` for displaying in-Discord alerts and toasts.
+  </Card>
+  <Card title="Utilities" href="/docs/api-reference/utilities">
+    `Logger`, `sleep`, `debounce`, `throttle`, and other common helper functions.
+  </Card>
+  <Card title="Webpack Utilities" href="/docs/api-reference/webpack">
+    `find`, `findByCode`, `waitFor` for accessing Discord's internal Webpack modules.
+  </Card>
+  <Card title="Internationalization" href="/docs/api-reference/i18n">
+    `t`, proxy key access, and React hooks for multilingual plugin support.
+  </Card>
+</Cards>
+
+## Import Paths
+
+All Plexcord APIs use path aliases. Here's a quick reference:
+
+```typescript
+// Core plugin definition
+import definePlugin, { OptionType, StartAt } from "@utils/types";
+
+// Plugin settings
+import { definePluginSettings, Settings } from "@api/Settings";
+
+// Storage
+import { DataStore } from "@api/DataStore";
+
+// Notifications
+import { showNotification, showToast } from "@api/Notifications";
+
+// Logging
+import { Logger } from "@utils/Logger";
+
+// UI APIs
+import { addContextMenuPatch } from "@api/ContextMenu";
+import { addChatBarButton } from "@api/ChatButtons";
+import { addMessageAccessory } from "@api/MessageAccessories";
+import { addDecoration } from "@api/MessageDecorations";
+
+// Internationalization
+import { t, plugin, common, useTranslation } from "@api/i18n";
+
+// Discord common modules
+import { UserStore, ChannelStore, GuildStore, MessageStore } from "@webpack/common";
+import { React, useState, useEffect, useRef } from "@webpack/common";
+
+// Webpack search
+import { find, findByCode, findByProps } from "@webpack";
+```
+
+## TypeScript Interfaces
+
+### Plugin Author
+
+```typescript
+interface PluginAuthor {
+    name: string;
+    id: bigint;  // Discord user ID as BigInt
+}
+```
+
+### Plugin Definition
+
+```typescript
+interface PluginDef {
+    // Required
+    name: string;
+    description: string;
+    authors: PluginAuthor[];
+
+    // Optional lifecycle
+    start?(): void;
+    stop?(): void;
+    startAt?: StartAt;
+
+    // Optional features
+    settings?: PluginSettingsDef;
+    patches?: Patch[];
+    commands?: Command[];
+    flux?: Record<string, FluxHandler>;
+
+    // Optional metadata
+    dependencies?: string[];
+    required?: boolean;
+    enabledByDefault?: boolean;
+    tags?: string[];
+    settingsAboutComponent?: () => JSX.Element;
+}
+```
+
+## Type Definitions
+
+Full TypeScript definitions are available in the package.

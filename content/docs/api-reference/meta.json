@@ -1,0 +1,13 @@
+{
+  "title": "API Reference",
+  "icon": "Code",
+  "pages": [
+    "index",
+    "core-apis",
+    "data-storage",
+    "notifications",
+    "utilities",
+    "webpack",
+    "i18n"
+  ]
+}

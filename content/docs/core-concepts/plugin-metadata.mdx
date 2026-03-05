@@ -1,0 +1,238 @@
+﻿---
+title: Plugin Metadata
+description: Master all Plexcord plugin metadata fields. Learn required, enabledByDefault, dependencies, tags, and how they affect plugin behavior.
+published: 2026-03-02
+tags: [metadata, required, dependencies, tags, enabledByDefault]
+---
+
+{/*
+ * This file is part of docs.plexcord.club.
+ * Copyright (c) 2026 Plexcord.
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ */}
+
+# Plugin Metadata
+
+Beyond the three required fields (`name`, `description`, `authors`), Plexcord lets you define metadata that controls how your plugin behaves, how it's discovered, and how it interacts with other plugins.
+
+## Required Fields (Review)
+
+```typescript
+export default definePlugin({
+    name: "MyPlugin",          // Unique display name
+    description: "Does X",     // Short description for the settings UI
+    authors: [
+        { name: "Dev", id: 123456789012345678n }
+    ],
+    // ...
+});
+```
+
+These three are always required. Every other field is optional.
+
+## `required`
+
+Prevents users from disabling the plugin. Use this only for critical infrastructure plugins.
+
+```typescript
+required: true,
+```
+
+**When to use:**
+- Your plugin provides APIs that other plugins depend on
+- Your plugin is a core Plexcord component
+- Disabling would break fundamental functionality
+
+<Callout type="warning">
+  Use `required: true` sparingly. Users generally don't like plugins they can't disable.
+</Callout>
+
+## `enabledByDefault`
+
+Enables the plugin by default for new Plexcord installs. It can still be disabled.
+
+```typescript
+enabledByDefault: true,
+```
+
+**When to use:**
+- General-purpose improvements most users will want
+- Fixes for Discord UX issues
+- Quality-of-life improvements that don't change behavior dramatically
+
+## `dependencies`
+
+Declares other plugins that must be enabled for yours to work. If a dependency is disabled, Plexcord warns the user.
+
+```typescript
+dependencies: ["MessageLogger", "UserTags"],
+```
+
+Example: a plugin that adds UI to a message Logger:
+
+```typescript
+export default definePlugin({
+    name: "MessageLoggerEnhancer",
+    description: "Adds extra features to MessageLogger",
+    authors: [{ name: "You", id: 0n }],
+    dependencies: ["MessageLogger"],   // MessageLogger must be on
+
+    start() {
+        // Safe to use MessageLogger APIs here because we declared the dependency
+        const logger = Vencord.Plugins.plugins.MessageLogger;
+        logger.registerExtension(this);
+    }
+});
+```
+
+<Callout type="info">
+  `dependencies` is a string array of plugin names (the `name` field of each plugin, not the file name).
+</Callout>
+
+## `tags`
+
+An array of tags that help users find your plugin via search in the settings UI.
+
+```typescript
+tags: ["utility", "messages", "formatting", "productivity"],
+```
+
+Good tags to use:
+- Feature category: `"utility"`, `"fun"`, `"moderation"`, `"accessibility"`
+- What it affects: `"messages"`, `"voice"`, `"channels"`, `"server"`, `"friends"`
+- How it works: `"notifications"`, `"commands"`, `"shortcuts"`, `"appearance"`
+
+<Callout type="info">
+  Tags are not shown to users directly; they're only used for filtering/searching. Don't use overly generic tags like `"discord"` or `"plugin"`.
+</Callout>
+
+## `settingsAboutComponent`
+
+A React component displayed at the top of the plugin's settings panel. Use it to show docs links, warnings, or info.
+
+```typescript
+import { Link } from "@components/Link";
+
+export default definePlugin({
+    name: "MyPlugin",
+    description: "...",
+    authors: [{ name: "You", id: 0n }],
+
+    settingsAboutComponent() {
+        return (
+            <div>
+                <p>This plugin modifies how messages are displayed.</p>
+                <Link href="https://github.com/MutanPlex/Plexcord">
+                    View source on GitHub
+                </Link>
+            </div>
+        );
+    }
+});
+```
+
+## `patches` and when they're applied
+
+Patches are applied when the plugin is enabled (or at startup). They're automatically removed when the plugin is disabled. You don't need special metadata for this; just declare them:
+
+```typescript
+patches: [
+    {
+        find: "someDiscordFunctionName",
+        replacement: {
+            match: /someRegex/,
+            replace: "newCode"
+        }
+    }
+],
+```
+
+See [Patches System](/docs/advanced-features/patches) for the complete guide.
+
+## Full Metadata Example
+
+```typescript
+import definePlugin, { OptionType } from "@utils/types";
+import { definePluginSettings } from "@api/Settings";
+
+const settings = definePluginSettings({
+    compact: {
+        type: OptionType.BOOLEAN,
+        description: "Use compact mode",
+        default: false
+    }
+});
+
+export default definePlugin({
+    name: "MessageEnhancer",
+    description: "Enhances the message display with extra formatting options",
+    authors: [
+        { name: "Alice", id: 111222333444555666n },
+        { name: "Bob", id: 777888999000111222n }
+    ],
+
+    // Metadata
+    tags: ["messages", "formatting", "utility"],
+    enabledByDefault: false,
+    required: false,
+    dependencies: [],
+
+    // Settings
+    settings,
+
+    settingsAboutComponent() {
+        return (
+            <p style={{ color: "var(--text-muted)" }}>
+                MessageEnhancer adds formatting buttons to the message toolbar.
+                Works best with the default Discord theme.
+            </p>
+        );
+    },
+
+    start() {
+        console.log("[MessageEnhancer] Started");
+    },
+
+    stop() {
+        console.log("[MessageEnhancer] Stopped");
+    }
+});
+```
+
+## Metadata Quick Reference
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `name` | `string` | required | Unique plugin name |
+| `description` | `string` | required | Short description |
+| `authors` | `Author[]` | required | Plugin authors |
+| `required` | `boolean` | `false` | Cannot be disabled |
+| `enabledByDefault` | `boolean` | `false` | ON for new installs |
+| `dependencies` | `string[]` | `[]` | Required other plugins |
+| `tags` | `string[]` | `[]` | Search tags |
+| `settingsAboutComponent` | `Component` | `undefined` | Info block in settings |
+| `startAt` | `StartAt` | `DOMContentLoaded` | Init timing |
+
+## Next Steps
+
+<Cards>
+  <Card title="Settings Deep Dive" href="/docs/core-concepts/settings-deep-dive">
+    Learn every OptionType and advanced settings patterns.
+  </Card>
+  <Card title="Platform-Specific Plugins" href="/docs/core-concepts/platform-specific">
+    Write plugins that target specific Discord platforms.
+  </Card>
+</Cards>

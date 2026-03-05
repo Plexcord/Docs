@@ -1,0 +1,59 @@
+﻿---
+title: Setting Up Your Editor
+description: Configure Visual Studio Code with the recommended extensions for Plexcord plugin development.
+published: 2026-03-05
+tags: [vscode, editor, extensions, setup]
+---
+
+{/*
+ * This file is part of docs.plexcord.club.
+ * Copyright (c) 2026 Plexcord.
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ */}
+
+# Setting Up Your Editor
+
+We use **Visual Studio Code** to develop Plexcord, and our configs and extensions are tailored to it. We strongly recommend using VSCode for the best development experience.
+
+If you don't have it yet, download it from [code.visualstudio.com](https://code.visualstudio.com/).
+
+## Installing Recommended Extensions
+
+Open your Plexcord directory in VSCode. You should see a notification in the bottom-right corner asking if you want to install the recommended extensions.
+
+If you don't see the notification, open the **Extensions** tab in the left sidebar and look for the **Recommended** section.
+
+Accept the prompt and VSCode will install the following extensions:
+
+| Extension | Purpose |
+|-----------|---------|
+| [**EditorConfig**](https://marketplace.visualstudio.com/items?itemName=EditorConfig.EditorConfig) | Configures formatting settings to match Plexcord's code style |
+| [**ESLint**](https://marketplace.visualstudio.com/items?itemName=dbaeumer.vscode-eslint) | Enforces consistent code style and catches common errors |
+| [**StyleLint**](https://marketplace.visualstudio.com/items?itemName=stylelint.vscode-stylelint) | Same as ESLint, but for CSS files |
+| [**Plexcord Companion**](https://marketplace.visualstudio.com/items?itemName=MutanPlex.plexcord-companion) | Our homemade extension — adds useful features and code snippets for Plexcord development |
+| [**JSON2TS**](https://marketplace.visualstudio.com/items?itemName=GregorBiswanger.json2ts) | Converts JSON objects to TypeScript interfaces; very useful for auto-generating types for Discord objects |
+
+<Callout type="info">
+  **Plexcord Companion** is especially useful. It provides IntelliSense for Plexcord-specific APIs, snippets for common plugin patterns, and real-time feedback while writing patches.
+</Callout>
+
+## Next Steps
+
+<Cards>
+  <Card title="Quick Start" href="/docs/getting-started/quick-start">
+    Build and run your first plugin.
+  </Card>
+</Cards>

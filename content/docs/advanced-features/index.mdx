@@ -1,0 +1,72 @@
+﻿---
+title: Advanced Features
+description: Explore Plexcord's most powerful plugin capabilities. Patches, commands, Flux events, context menus, message decorations, and UI extensions.
+published: 2026-03-02
+tags: [advanced, patches, commands, flux, context-menus, ui]
+---
+
+{/*
+ * This file is part of docs.plexcord.club.
+ * Copyright (c) 2026 Plexcord.
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ */}
+
+# Advanced Features
+
+This section covers Plexcord's most powerful plugin capabilities. These features let you modify Discord's behavior deeply: patching its code, adding commands, and extending its UI.
+
+## What You'll Learn
+
+<Cards>
+  <Card title="Patches System" href="/docs/advanced-features/patches">
+    Modify Discord's JavaScript source code at runtime using regex-based patching. The most powerful and most dangerous feature.
+  </Card>
+  <Card title="Commands System" href="/docs/advanced-features/commands">
+    Create custom Discord slash commands with options, autocomplete, and message responses.
+  </Card>
+  <Card title="Flux Events" href="/docs/advanced-features/flux-events">
+    Subscribe to Discord's internal event bus. React to messages, presence updates, channel switches, and hundreds of other events.
+  </Card>
+  <Card title="Context Menus" href="/docs/advanced-features/context-menus">
+    Add items to right-click menus on users, messages, channels, and guilds.
+  </Card>
+  <Card title="Message Decorations" href="/docs/advanced-features/message-decorations">
+    Add visual overlays and decorators to Discord messages.
+  </Card>
+  <Card title="Buttons & UI Extensions" href="/docs/advanced-features/buttons-ui">
+    Add buttons and UI elements to the chat bar, message popover, and header bar.
+  </Card>
+</Cards>
+
+## Prerequisites
+
+Before using advanced features, you should be comfortable with:
+- [Plugin structure and lifecycle](/docs/getting-started/plugin-structure)
+- [Settings system](/docs/getting-started/adding-settings)
+- [Core Concepts](/docs/core-concepts) (especially debugging)
+
+## Feature Overview
+
+| Feature | Complexity | Use Case |
+|---------|-----------|----------|
+| Patches | ⚠️ High | Modify Discord's behavior at the code level |
+| Commands | 🟡 Medium | Add `/mycommand` to Discord |
+| Flux Events | 🟢 Low | React to things happening in Discord |
+| Context Menus | 🟡 Medium | Add right-click menu items |
+| Message Decorations | 🟡 Medium | Overlay elements on messages |
+| Buttons & UI | 🟡 Medium | Add toolbar buttons |
+
+Start with **Flux Events** if you're new to advanced features; they're the safest and most straightforward.

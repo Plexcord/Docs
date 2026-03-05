@@ -1,0 +1,316 @@
+﻿---
+title: Plugin Structure
+description: Deep dive into the definePlugin interface. Learn every property, lifecycle method, and pattern used in Plexcord plugins.
+published: 2026-03-02
+tags: [definePlugin, structure, lifecycle, metadata]
+---
+
+{/*
+ * This file is part of docs.plexcord.club.
+ * Copyright (c) 2026 Plexcord.
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ */}
+
+# Plugin Structure
+
+Every Plexcord plugin is built around a single function: `definePlugin()`. This guide explains every property you can use.
+
+## The definePlugin Signature
+
+```typescript
+import definePlugin, { OptionType } from "@utils/types";
+
+export default definePlugin({
+    // --- Required ---
+    name: "MyPlugin",
+    description: "What this plugin does",
+    authors: [{ name: "You", id: 0n }],
+
+    // --- Optional Lifecycle ---
+    start() {},
+    stop() {},
+    startAt: StartAt.DOMContentLoaded,
+
+    // --- Optional Features ---
+    settings: undefined,   // Plugin settings definition
+    patches: [],           // Code patches
+    commands: [],          // Slash commands
+    flux: {},              // Flux event listeners
+
+    // --- Optional Metadata ---
+    dependencies: [],      // Other plugins this requires
+    required: false,       // Can't be disabled
+    enabledByDefault: false,
+    tags: [],
+});
+```
+
+## Required Properties
+
+### `name`
+The unique identifier and display name of your plugin.
+
+```typescript
+name: "Bettertyping",
+```
+
+- Must be unique across all plugins
+- Shown in the plugins list in Discord settings
+- Used for logging and debugging
+- PascalCase is the convention
+
+### `description`
+A short description shown below the plugin name in settings.
+
+```typescript
+description: "Improves the typing indicator in DMs",
+```
+
+Keep it under 100 characters. It appears directly in the settings UI.
+
+### `authors`
+An array of author objects. Each author has a `name` and optional Discord `id`.
+
+```typescript
+authors: [
+    {
+        name: "YourName",
+        id: 123456789012345678n   // Discord user ID as BigInt
+    },
+    {
+        name: "Collaborator",
+        id: 987654321098765432n
+    }
+],
+```
+
+<Callout type="info">
+  The `id` is a BigInt (notice the `n` suffix). You can find your Discord ID by enabling Developer Mode in Discord settings, then right-clicking your name.
+</Callout>
+
+## Lifecycle Methods
+
+### `start()`
+Called when the plugin is enabled or when Discord loads with the plugin already enabled.
+
+```typescript
+start() {
+    // Set up intervals, event listeners, DOM manipulation
+    this.interval = setInterval(() => {
+        console.log("Tick");
+    }, 5000);
+},
+```
+
+<Callout type="warning">
+  Store any resources (timers, listeners) you create in `start()` so you can clean them up in `stop()`.
+</Callout>
+
+### `stop()`
+Called when the plugin is disabled. **Always clean up side effects here.**
+
+```typescript
+stop() {
+    // Clean up everything created in start()
+    clearInterval(this.interval);
+    document.removeEventListener("click", this.handler);
+},
+```
+
+If you don't clean up properly, effects from your plugin will persist even after it's disabled.
+
+### `startAt`
+Controls when in the Discord startup sequence your plugin initializes.
+
+```typescript
+import { StartAt } from "@utils/types";
+
+startAt: StartAt.DOMContentLoaded,   // Default - after DOM is ready
+startAt: StartAt.Init,               // Very early, minimal Discord loaded
+startAt: StartAt.WebpackReady,       // After Webpack modules are available
+```
+
+| Value | When it runs | Use when |
+|-------|-------------|----------|
+| `StartAt.Init` | Very early startup | Modifying core internals |
+| `StartAt.DOMContentLoaded` | DOM is ready (default) | Most plugins |
+| `StartAt.WebpackReady` | Webpack modules loaded | Accessing Discord modules |
+
+## Plugin Settings
+
+Define a settings panel using the `settings` property. See [Adding Settings](/docs/getting-started/adding-settings) for full details.
+
+```typescript
+import { definePluginSettings } from "@api/Settings";
+import { OptionType } from "@utils/types";
+
+const settings = definePluginSettings({
+    showBadge: {
+        type: OptionType.BOOLEAN,
+        description: "Show a badge next to the username",
+        default: true
+    }
+});
+
+export default definePlugin({
+    name: "MyPlugin",
+    description: "...",
+    authors: [{ name: "You", id: 0n }],
+    settings,
+
+    start() {
+        if (settings.store.showBadge) {
+            // Badge logic
+        }
+    }
+});
+```
+
+## Patches
+
+Patches modify Discord's source code at runtime using regex replacement. They're the most powerful plugin feature.
+
+```typescript
+patches: [
+    {
+        find: "showCooldownTooltip",
+        replacement: {
+            match: /\.cooldown\b/,
+            replace: ".cooldown && false"  // Disables cooldown check
+        }
+    }
+],
+```
+
+See [Patches System](/docs/advanced-features/patches) for complete documentation.
+
+## Commands
+
+Register Discord slash commands:
+
+```typescript
+commands: [
+    {
+        name: "ping",
+        description: "Check if Plexcord is responding",
+        execute() {
+            return { content: "Pong!" };
+        }
+    }
+],
+```
+
+See [Commands System](/docs/advanced-features/commands) for complete documentation.
+
+## Flux Listeners
+
+Subscribe to Discord's internal event system:
+
+```typescript
+flux: {
+    MESSAGE_CREATE({ message }) {
+        console.log("New message:", message.content);
+    },
+    PRESENCE_UPDATE({ user }) {
+        console.log("User came online:", user.username);
+    }
+},
+```
+
+See [Flux Events](/docs/advanced-features/flux-events) for all available events.
+
+## Plugin Dependencies
+
+Declare other plugins that yours depends on:
+
+```typescript
+dependencies: ["MessageLogger", "UserTags"],
+```
+
+If a dependency is disabled, Plexcord will warn the user and may disable your plugin.
+
+## Other Metadata
+
+```typescript
+// This plugin cannot be turned off by the user
+required: true,
+
+// Enabled by default for all users
+enabledByDefault: true,
+
+// Tags help users find the plugin via search
+tags: ["utility", "messages", "formatting"],
+```
+
+## Complete Example
+
+Here's a full plugin that demonstrates multiple features:
+
+```typescript
+import definePlugin, { OptionType } from "@utils/types";
+import { definePluginSettings } from "@api/Settings";
+import { Logger } from "@utils/Logger";
+
+const logger = new Logger("ExamplePlugin", "#FFD700");
+
+const settings = definePluginSettings({
+    enabled: {
+        type: OptionType.BOOLEAN,
+        description: "Enable the main feature",
+        default: true
+    },
+    prefix: {
+        type: OptionType.STRING,
+        description: "Prefix added to log messages",
+        default: "[Example]"
+    }
+});
+
+export default definePlugin({
+    name: "ExamplePlugin",
+    description: "Demonstrates all plugin structure features",
+    authors: [{ name: "Dev", id: 123456789n }],
+    settings,
+    tags: ["example", "demo"],
+
+    start() {
+        logger.info("Plugin started with settings:", settings.store);
+    },
+
+    stop() {
+        logger.info("Plugin stopped.");
+    },
+
+    flux: {
+        MESSAGE_CREATE({ message }) {
+            if (settings.store.enabled) {
+                logger.info(settings.store.prefix, "Message:", message.content);
+            }
+        }
+    }
+});
+```
+
+## Next Steps
+
+<Cards>
+  <Card title="Adding Settings" href="/docs/getting-started/adding-settings">
+    Create a rich settings panel for your plugin.
+  </Card>
+  <Card title="Patches System" href="/docs/advanced-features/patches">
+    Modify Discord's code at runtime.
+  </Card>
+</Cards>

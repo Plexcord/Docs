@@ -1,0 +1,192 @@
+﻿---
+title: Keyword Alert Plugin
+description: An intermediate Plexcord plugin that monitors messages for user-defined keywords and sends notifications. Demonstrates settings, Flux events, and stores.
+published: 2026-03-02
+tags: [example, intermediate, keyword, notification, flux, settings]
+---
+
+{/*
+ * This file is part of docs.plexcord.club.
+ * Copyright (c) 2026 Plexcord.
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ */}
+
+# Example: Keyword Alert Plugin
+
+**Difficulty:** Intermediate | **Concepts:** Plugin settings, Flux events, Webpack stores, `showNotification`
+
+This plugin watches incoming messages for keywords you define. When a match is found, you get a notification with the message content and author. This demonstrates the most common pattern in Plexcord plugins: **listen to a Flux event → read settings → take action**.
+
+---
+
+## Full Source
+
+```typescript
+// File: src/plugins/keywordAlert/index.ts
+
+import definePlugin, { OptionType } from "@utils/types";
+import { definePluginSettings } from "@api/Settings";
+import { showNotification } from "@api/Notifications";
+import { UserStore, NavigationUtils } from "@webpack/common";
+import { Logger } from "@utils/Logger";
+
+const logger = new Logger("KeywordAlert");
+
+const settings = definePluginSettings({
+    keywords: {
+        type: OptionType.STRING,
+        description: "Comma-separated keywords to watch for",
+        default: "important, urgent",
+        restartNeeded: false
+    },
+    caseSensitive: {
+        type: OptionType.BOOLEAN,
+        description: "Match keywords with exact case",
+        default: false,
+        restartNeeded: false
+    },
+    ignoreSelf: {
+        type: OptionType.BOOLEAN,
+        description: "Don't alert for your own messages",
+        default: true,
+        restartNeeded: false
+    }
+});
+
+export default definePlugin({
+    name: "KeywordAlert",
+    description: "Notifies you when anyone uses your watched keywords",
+    authors: [
+        {
+            name: "YourName",
+            id: 0n
+        }
+    ],
+    settings,
+
+    flux: {
+        MESSAGE_CREATE({ message }) {
+            try {
+                const me = UserStore.getCurrentUser();
+
+                // Ignore own messages if setting is on
+                if (settings.store.ignoreSelf && message.author.id === me?.id) return;
+
+                // Skip bots
+                if (message.author.bot) return;
+
+                // Parse keyword list
+                const raw = settings.store.keywords;
+                const keywords = raw
+                    .split(",")
+                    .map(k => k.trim())
+                    .filter(Boolean);
+
+                if (keywords.length === 0) return;
+
+                const content = settings.store.caseSensitive
+                    ? message.content
+                    : message.content.toLowerCase();
+
+                const matched = keywords.find(kw => {
+                    const needle = settings.store.caseSensitive ? kw : kw.toLowerCase();
+                    return content.includes(needle);
+                });
+
+                if (!matched) return;
+
+                // Truncate long messages
+                const preview = message.content.length > 120
+                    ? message.content.slice(0, 120) + "…"
+                    : message.content;
+
+                showNotification({
+                    title: `🔔 Keyword: "${matched}"`,
+                    body: `${message.author.username}: ${preview}`,
+                    color: "#FAA61A",
+                    onClick: () => {
+                        // Navigate to the message's channel
+                        if (message.guild_id) {
+                            NavigationUtils.transitionToGuild(
+                                message.guild_id,
+                                message.channel_id
+                            );
+                        }
+                    }
+                });
+
+                logger.info(`Keyword "${matched}" found in message from ${message.author.username}`);
+
+            } catch (e) {
+                logger.error("Error processing message:", e);
+            }
+        }
+    }
+});
+```
+
+---
+
+## Key Concepts Used
+
+### Plugin Settings
+
+The `settings` object uses `definePluginSettings` to create three user-configurable options:
+
+- `keywords`: a `STRING` option that Plexcord renders as a text input
+- `caseSensitive`: a `BOOLEAN` rendered as a toggle
+- `ignoreSelf`: a `BOOLEAN` rendered as a toggle
+
+These automatically appear in **Settings → Plugins → KeywordAlert**.
+
+### Flux Event Listener
+
+```typescript
+flux: {
+    MESSAGE_CREATE({ message }) { ... }
+}
+```
+
+Every time any message is received in any channel you have loaded, this function runs. The destructured `message` object includes `content`, `author`, `channel_id`, `guild_id`, and more.
+
+### Reading Settings at Runtime
+
+```typescript
+settings.store.keywords  // Always the current value
+settings.store.caseSensitive
+```
+
+Because `restartNeeded: false`, settings are read on every event, so no restart is needed when the user changes them.
+
+---
+
+## Testing It
+
+1. Copy the file to `src/plugins/keywordAlert/index.ts`
+2. Rebuild Plexcord
+3. Enable the plugin in Settings → Plugins
+4. Configure your keywords
+5. Send a message in any channel containing one of your keywords
+
+---
+
+## Next Example
+
+<Cards>
+  <Card title="Message Formatter" href="/docs/examples/message-formatter">
+    Use patches to modify how Discord renders messages.
+  </Card>
+</Cards>

@@ -1,0 +1,203 @@
+﻿---
+title: Message Formatter Plugin
+description: An intermediate Plexcord plugin that uses patches to modify Discord's message rendering. Demonstrates the patch system with real regex replacements.
+published: 2026-03-02
+tags: [example, intermediate, patches, regex, message, formatting]
+---
+
+{/*
+ * This file is part of docs.plexcord.club.
+ * Copyright (c) 2026 Plexcord.
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ */}
+
+# Example: Message Formatter Plugin
+
+**Difficulty:** Intermediate | **Concepts:** Patches, regex replacements, Webpack module access
+
+This plugin intercepts Discord's message parsing layer and transforms text before it renders. Specifically it auto-converts plain-text emoji codes like `:smile:` that Discord's native parser might miss, and optionally uppercases `@everyone`.
+
+This is a practical introduction to the **patch system**, one of the most powerful tools in Plexcord.
+
+---
+
+## Full Source
+
+```typescript
+// File: src/plugins/messageFormatter/index.ts
+
+import definePlugin, { OptionType } from "@utils/types";
+import { definePluginSettings } from "@api/Settings";
+import { Logger } from "@utils/Logger";
+
+const logger = new Logger("MessageFormatter");
+
+const settings = definePluginSettings({
+    emphasizeEveryone: {
+        type: OptionType.BOOLEAN,
+        description: 'Makes "@everyone" and "@here" visually bold in rendered messages',
+        default: false,
+        restartNeeded: true  // Patch changes require restart
+    },
+    showWordCount: {
+        type: OptionType.BOOLEAN,
+        description: "Add a word count badge to messages longer than 100 words",
+        default: false,
+        restartNeeded: true
+    }
+});
+
+// A simple word counter utility
+function countWords(text: string): number {
+    return text.trim().split(/\s+/).filter(Boolean).length;
+}
+
+export default definePlugin({
+    name: "MessageFormatter",
+    description: "Transforms message content with optional formatting enhancements",
+    authors: [
+        {
+            name: "YourName",
+            id: 0n
+        }
+    ],
+    settings,
+
+    patches: [
+        // Patch 1: Emphasize @everyone and @here
+        {
+            find: "parseEveryone",
+            predicate: () => settings.store.emphasizeEveryone,
+            replacement: {
+                match: /parseEveryone\((\i)\)/,
+                replace: "parseEveryone($1).map(token => "
+                    + "token.type === 'mention' && (token.content === '@everyone' || token.content === '@here') "
+                    + "? { ...token, content: '**' + token.content + '**' } "
+                    + ": token)"
+            }
+        },
+        // Patch 2: Add word count to long messages
+        // This patches the MessageContent component render function
+        {
+            find: "messageContent",
+            predicate: () => settings.store.showWordCount,
+            replacement: {
+                match: /(\i)\.content,children:\[(\i),/,
+                replace: "$1.content,children:[$2,"
+                    + "Vencord.Webpack.Common.React.createElement('span', "
+                    + "{ style: { opacity: 0.4, fontSize: '10px', marginLeft: '4px' } },"
+                    + "$self.getWordCountBadge($1.content)),"
+            }
+        }
+    ],
+
+    // Called by the patch above
+    getWordCountBadge(content: string): string | null {
+        if (!settings.store.showWordCount) return null;
+        const count = countWords(content);
+        if (count < 100) return null;
+        return `${count}w`;
+    }
+});
+```
+
+---
+
+## Breaking Down the Patches
+
+### Patch Anatomy
+
+Every patch has three required properties:
+
+```typescript
+{
+    find: "uniqueStringInModule",   // Which module to patch
+    replacement: {
+        match: /regexPattern/,      // What to find in the function's source
+        replace: "replacement"      // What to replace it with
+    }
+}
+```
+
+### `predicate`
+
+The optional `predicate` function controls whether a patch is applied at all. Here we tie it to the plugin setting:
+
+```typescript
+predicate: () => settings.store.emphasizeEveryone
+```
+
+If the setting is `false`, the patch is skipped entirely. This avoids unnecessary monkey-patching.
+
+### `$self` in Replacements
+
+Inside a replacement string, `$self` refers to the plugin object itself. This lets you call plugin methods from within patched code:
+
+```typescript
+replace: "...$self.getWordCountBadge($1.content)..."
+```
+
+Then define the method on the plugin:
+
+```typescript
+export default definePlugin({
+    // ...
+    getWordCountBadge(content: string) { ... }
+});
+```
+
+### Capture Groups
+
+The regex `(\i)` captures an identifier (a minified variable name). In the replacement, `$1` refers to the first captured group.
+
+---
+
+## Debugging Patches
+
+If a patch doesn't work, open DevTools and check:
+
+```javascript
+// See all patches and whether they applied
+Vencord.Plugins.plugins.MessageFormatter.patches
+```
+
+You can also search for the module manually:
+
+```javascript
+// Find what 'parseEveryone' belongs to
+Object.values(Vencord.Webpack.wreq.c)
+    .filter(m => m.exports?.toString?.().includes("parseEveryone"))
+```
+
+---
+
+## Important Notes
+
+<Callout type="warn">
+- Patches with `restartNeeded: true` only take effect after Plexcord rebuilds and Discord restarts
+- When Discord updates its source, obfuscated variable names change; your `(\i)` captures will still work but the surrounding context string may need to be updated
+- Always use the most unique `find` string possible to avoid accidentally patching the wrong module
+</Callout>
+
+---
+
+## Next Example
+
+<Cards>
+  <Card title="Voice Logger" href="/docs/examples/voice-logger">
+    Advanced: persistent data storage and voice state tracking.
+  </Card>
+</Cards>

@@ -1,0 +1,10 @@
+{
+  "title": "Best Practices",
+  "icon": "CircleCheck",
+  "pages": [
+    "index",
+    "code-quality",
+    "performance",
+    "security"
+  ]
+}

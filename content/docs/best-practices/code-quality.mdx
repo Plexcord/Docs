@@ -1,0 +1,302 @@
+﻿---
+title: Code Quality
+description: TypeScript patterns, naming conventions, code organization, and clean code guidelines for Plexcord plugin development.
+published: 2026-03-02
+tags: [best-practices, code-quality, TypeScript, naming, organization]
+---
+
+{/*
+ * This file is part of docs.plexcord.club.
+ * Copyright (c) 2026 Plexcord.
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ */}
+
+# Code Quality
+
+Writing maintainable plugin code is as important as writing working code. These guidelines help you produce plugins that are easy to understand, test, and update.
+
+---
+
+## Use TypeScript Fully
+
+Plexcord is TypeScript-first. Lean on it completely.
+
+### Always type your data models
+
+```typescript
+// ✅ Good: clear, self-documenting
+interface SavedMessage {
+    id: string;
+    content: string;
+    authorId: string;
+    savedAt: number;
+}
+
+// ❌ Avoid: all information lost
+const data: any = { id: "...", content: "..." };
+```
+
+### Type-safe settings access
+
+When you use `definePluginSettings`, the returned object is fully typed:
+
+```typescript
+const settings = definePluginSettings({
+    maxItems: { type: OptionType.NUMBER, description: "...", default: 10 }
+});
+
+// settings.store.maxItems is typed as number
+const limit: number = settings.store.maxItems;
+```
+
+### Avoid `as any` in patches
+
+In patches' replacement strings you sometimes must use runtime code that bypasses type checking. Keep these sandboxed:
+
+```typescript
+// Acceptable: isolated to the replacement string
+replacement: {
+    replace: "$self.handleRender($1.props)"
+}
+
+// Plugin method is properly typed
+handleRender(props: MessageProps): string {
+    return props.content.toUpperCase();
+}
+```
+
+---
+
+## Naming Conventions
+
+| Item | Convention | Example |
+|------|-----------|---------|
+| Plugin file | camelCase folder | `src/plugins/myPlugin/index.ts` |
+| Plugin name | PascalCase string | `name: "MyPlugin"` |
+| Settings variable | `settings` (always) | `const settings = definePluginSettings(...)` |
+| Logger variable | `logger` (always) | `const logger = new Logger("MyPlugin")` |
+| DataStore keys | `PluginName_keyName` | `"VoiceLogger_history"` |
+| Flux handler props | Destructure what you need | `({ message, channelId })` |
+
+---
+
+## File Organization
+
+For simple plugins, a single `index.ts` is enough:
+
+```
+src/plugins/myPlugin/
+└── index.ts
+```
+
+For complex plugins:
+
+```
+src/plugins/myPlugin/
+├── index.ts          ← Plugin entry, exports definePlugin
+├── settings.ts       ← definePluginSettings
+├── components/
+│   └── SettingsPanel.tsx
+├── utils.ts          ← Helper functions
+└── types.ts          ← TypeScript interfaces
+```
+
+---
+
+## Logger Usage
+
+Always use `Logger` instead of `console.log`:
+
+```typescript
+import { Logger } from "@utils/Logger";
+const logger = new Logger("MyPlugin");
+
+// ✅ Good
+logger.info("Processing", count, "messages");
+logger.error("Failed to save:", error);
+logger.debug("State:", JSON.stringify(state));
+
+// ❌ Avoid: no context, hard to filter in DevTools
+console.log("Processing messages");
+console.error(error);
+```
+
+In DevTools, you can filter by your plugin's prefix: type `MyPlugin` in the console filter.
+
+---
+
+## Clean Cleanup in `stop()`
+
+Every resource your plugin claims in `start()` must be released in `stop()`:
+
+```typescript
+start() {
+    // Register event listeners
+    document.addEventListener("keydown", this.keyHandler);
+
+    // Store interval reference
+    this.updateInterval = setInterval(() => this.update(), 5000);
+}
+
+stop() {
+    // ✅ Remove listener
+    document.removeEventListener("keydown", this.keyHandler);
+
+    // ✅ Clear interval
+    clearInterval(this.updateInterval);
+    this.updateInterval = null;
+}
+```
+
+If you don't clean up:
+- Disabled plugins continue consuming memory and CPU
+- Event handlers fire after the plugin is off
+- Users must restart Discord to fully unload your plugin
+
+---
+
+## Flux Error Handling
+
+Flux event handlers run in Discord's event loop. An unhandled error can break all subsequent events for that type across all plugins. Always wrap your handlers:
+
+```typescript
+flux: {
+    MESSAGE_CREATE({ message }) {
+        try {
+            this.processMessage(message);
+        } catch (e) {
+            logger.error("Unhandled error in MESSAGE_CREATE:", e);
+        }
+    }
+}
+```
+
+---
+
+## Idiomatic Plugin Structure
+
+```typescript
+import definePlugin, { OptionType } from "@utils/types";
+import { definePluginSettings } from "@api/Settings";
+import { Logger } from "@utils/Logger";
+
+// 1. Logger at the top
+const logger = new Logger("MyPlugin");
+
+// 2. Settings next
+const settings = definePluginSettings({
+    enabled: {
+        type: OptionType.BOOLEAN,
+        description: "Enable feature X",
+        default: true
+    }
+});
+
+// 3. Pure utility functions (not on the plugin object)
+function computeSomething(input: string): string {
+    return input.trim();
+}
+
+// 4. Main plugin export
+export default definePlugin({
+    name: "MyPlugin",
+    description: "Does something useful",
+    authors: [{ name: "YourName", id: 0n }],
+    settings,
+
+    start() {
+        logger.info("Started");
+    },
+
+    stop() {
+        logger.info("Stopped");
+    },
+
+    flux: {
+        MESSAGE_CREATE({ message }) {
+            if (!settings.store.enabled) return;
+            try {
+                const result = computeSomething(message.content);
+                logger.debug("Result:", result);
+            } catch (e) {
+                logger.error("Error:", e);
+            }
+        }
+    }
+});
+```
+
+---
+
+## Localize User-Facing Strings
+
+Any string that appears in the UI (settings labels, notification bodies, button text) should use `t()` instead of a hardcoded value. This makes your plugin work for users in any supported language without any extra effort.
+
+```typescript
+import { t, plugin } from "@api/i18n";
+
+// ✅ Good: automatic Turkish, English, and future language support
+export default definePlugin({
+    name: "MyPlugin",
+    description: () => t(plugin.myPlugin.description),
+    settings: definePluginSettings({
+        feature: {
+            label: () => t(plugin.myPlugin.settings.featureLabel),
+            description: () => t(plugin.myPlugin.settings.featureDesc),
+            type: OptionType.BOOLEAN,
+            default: true
+        }
+    }),
+    start() {
+        showNotification({
+            title: t(plugin.myPlugin.notif.title),
+            body: t(plugin.myPlugin.notif.body)
+        });
+    }
+});
+
+// ❌ Avoid: hardcoded English, users in other locales get no translation
+export default definePlugin({
+    name: "MyPlugin",
+    description: "Does something useful",
+    settings: definePluginSettings({
+        feature: {
+            label: "Enable feature",
+            description: "Toggles the main feature on or off",
+            type: OptionType.BOOLEAN,
+            default: true
+        }
+    })
+});
+```
+
+Key rules:
+- Always wrap `t()` in a function (`() => t(...)`) inside `definePlugin`; strings are evaluated at render time, not at module load
+- Use proxy key access (`plugin.myPlugin.label`) instead of string literals, for IntelliSense and type safety
+- Add your strings to `src/locales/en.ts` under `plugin.yourPluginName.*`, then mirror them in `src/locales/tr.ts`
+
+See the [i18n API reference](/docs/api-reference/i18n) for the full guide.
+
+---
+
+<Cards>
+  <Card title="Performance" href="/docs/best-practices/performance">
+    Optimize your plugin for speed and low memory usage.
+  </Card>
+  <Card title="Security" href="/docs/best-practices/security">
+    Write safe plugins that protect user data.
+  </Card>
+</Cards>

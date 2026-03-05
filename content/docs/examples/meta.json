@@ -1,0 +1,11 @@
+{
+  "title": "Examples",
+  "icon": "FileCode",
+  "pages": [
+    "index",
+    "simple-notification",
+    "keyword-alert",
+    "message-formatter",
+    "voice-logger"
+  ]
+}

@@ -1,0 +1,304 @@
+﻿---
+title: Utilities
+description: Logger, sleep, debounce, throttle, and other helper utilities available to Plexcord plugins.
+published: 2026-03-02
+tags: [utilities, Logger, sleep, debounce, helpers]
+---
+
+{/*
+ * This file is part of docs.plexcord.club.
+ * Copyright (c) 2026 Plexcord.
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ */}
+
+# Utilities
+
+Plexcord ships several utility modules that make plugin development easier. This page covers the most commonly-used helpers.
+
+---
+
+## Logger
+
+The `Logger` class gives your plugin a consistent, labeled console output, much easier to spot in DevTools than plain `console.log`.
+
+### Import
+
+```typescript
+import { Logger } from "@utils/Logger";
+```
+
+### Creating a Logger
+
+```typescript
+const logger = new Logger("MyPlugin");
+```
+
+The first argument becomes the colored prefix in the console output: `[MyPlugin]`.
+
+### Methods
+
+| Method | Description | Console Method |
+|--------|-------------|----------------|
+| `logger.log(...args)` | General info | `console.log` |
+| `logger.info(...args)` | Info message | `console.info` |
+| `logger.warn(...args)` | Warning | `console.warn` |
+| `logger.error(...args)` | Error | `console.error` |
+| `logger.debug(...args)` | Debug info | `console.debug` |
+
+```typescript
+const logger = new Logger("MyPlugin");
+
+logger.log("Plugin started with settings:", settings.store);
+logger.info("Processing message from", message.author.username);
+logger.warn("Deprecated API used, consider updating");
+logger.error("Failed to fetch data:", error);
+logger.debug("Patch result:", patchedFunction.toString().slice(0, 200));
+```
+
+### Optional Color
+
+```typescript
+// Second argument: CSS color for the label
+const logger = new Logger("MyPlugin", "#43B581");
+```
+
+---
+
+## `sleep`
+
+Pauses execution for a given number of milliseconds. Works with `async/await`.
+
+### Import
+
+```typescript
+import { sleep } from "@utils/misc";
+```
+
+### Usage
+
+```typescript
+async function retryWithDelay() {
+    for (let i = 0; i < 3; i++) {
+        try {
+            await fetchData();
+            break;
+        } catch (e) {
+            logger.warn(`Attempt ${i + 1} failed, retrying in 1s...`);
+            await sleep(1000);
+        }
+    }
+}
+```
+
+---
+
+## `debounce`
+
+Wraps a function so it only executes after a specified delay has passed since the last call. Useful for search inputs or expensive event handlers.
+
+### Import
+
+```typescript
+import { debounce } from "@utils/debounce";
+```
+
+### Signature
+
+```typescript
+function debounce<T extends (...args: any[]) => any>(
+    fn: T,
+    delay: number
+): T
+```
+
+### Usage
+
+```typescript
+import { debounce } from "@utils/debounce";
+
+// Without debounce: fires on every keystroke
+function onSearchChange(value: string) {
+    expensiveSearch(value);
+}
+
+// With debounce: fires 300ms after the user stops typing
+const onSearchChange = debounce((value: string) => {
+    expensiveSearch(value);
+}, 300);
+```
+
+### In a Flux handler
+
+```typescript
+const processUpdate = debounce((data) => {
+    updateUI(data);
+}, 100);
+
+flux: {
+    TYPING_START(event) {
+        processUpdate(event);  // Won't spam updateUI
+    }
+}
+```
+
+---
+
+## `makeLazy`
+
+Creates a value that is computed only once, the first time it's accessed.
+
+### Import
+
+```typescript
+import { makeLazy } from "@utils/lazy";
+```
+
+### Usage
+
+```typescript
+import { makeLazy } from "@utils/lazy";
+
+// Computed only once, on first access
+const expensiveValue = makeLazy(() => {
+    return someExpensiveComputation();
+});
+
+// Acts like a function: call it to get the value
+const result = expensiveValue();
+```
+
+---
+
+## `proxyLazy` and `LazyComponent`
+
+These are used to defer module lookups until runtime, even when they are assigned at the module's top level.
+
+```typescript
+import { LazyComponent } from "@utils/lazyReact";
+import { proxyLazy } from "@utils/lazy";
+
+// Deferred React component import
+const MyComponent = LazyComponent(() => findByCode("someUniqueCode"));
+
+// Deferred module import
+const DiscordModule = proxyLazy(() => findByProps("someDiscordProp"));
+```
+
+<Callout type="info">
+Most `@webpack/common` exports are already wrapped in `proxyLazy`. Use `LazyComponent` when you need to import a React component from Discord's Webpack.
+</Callout>
+
+---
+
+## `classes`
+
+Merges CSS class names conditionally, similar to the popular `classnames` package.
+
+### Import
+
+```typescript
+import { classes } from "@utils/misc";
+```
+
+### Usage
+
+```typescript
+import { classes } from "@utils/misc";
+
+const className = classes(
+    "base-class",
+    isActive && "active",
+    isDisabled && "disabled",
+    customClass
+);
+// e.g., "base-class active" or "base-class disabled customClass"
+```
+
+---
+
+## `Queue`
+
+An async queue that runs tasks one at a time, preventing race conditions.
+
+### Import
+
+```typescript
+import { Queue } from "@utils/Queue";
+```
+
+### Usage
+
+```typescript
+import { Queue } from "@utils/Queue";
+
+const queue = new Queue();
+
+// Tasks are executed sequentially even if added concurrently
+users.forEach(user => {
+    queue.push(async () => {
+        await processUser(user);
+    });
+});
+```
+
+---
+
+## Common Pattern: Plugin with Utilities
+
+```typescript
+import definePlugin from "@utils/types";
+import { Logger } from "@utils/Logger";
+import { debounce } from "@utils/debounce";
+import { sleep } from "@utils/misc";
+
+const logger = new Logger("RateLimitHelper", "#FAA61A");
+
+export default definePlugin({
+    name: "RateLimitHelper",
+    description: "Demonstrates common utilities",
+    authors: [{ name: "You", id: 0n }],
+
+    start() {
+        logger.info("Plugin started");
+        this.setupHandlers();
+    },
+
+    stop() {
+        logger.info("Plugin stopped");
+    },
+
+    setupHandlers() {
+        this.handleEvent = debounce(async (data) => {
+            logger.debug("Processing event:", data);
+            await sleep(50); // Tiny pause to avoid rate limits
+            processData(data);
+        }, 200);
+    }
+});
+```
+
+---
+
+## Next Steps
+
+<Cards>
+  <Card title="Webpack Module Access" href="/docs/api-reference/webpack">
+    Find and use Discord's internal modules.
+  </Card>
+  <Card title="Performance Best Practices" href="/docs/best-practices/performance">
+    When and how to use debounce, memoization, and more.
+  </Card>
+</Cards>

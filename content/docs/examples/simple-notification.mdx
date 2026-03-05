@@ -1,0 +1,105 @@
+﻿---
+title: Simple Notification Plugin
+description: A beginner-level Plexcord plugin that shows a welcome notification when installed. Learn the bare minimum of a working plugin.
+published: 2026-03-02
+tags: [example, beginner, notification, simple]
+---
+
+{/*
+ * This file is part of docs.plexcord.club.
+ * Copyright (c) 2026 Plexcord.
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ */}
+
+# Example: Simple Notification Plugin
+
+**Difficulty:** Beginner | **Concepts:** `definePlugin`, `start()`, `showNotification`
+
+This is the simplest possible "real" plugin; it shows a notification when Discord starts with Plexcord loaded. Perfect for understanding the minimum structure of a plugin.
+
+---
+
+## Full Source
+
+```typescript
+// File: src/plugins/myFirstPlugin/index.ts
+
+import definePlugin from "@utils/types";
+import { showNotification } from "@api/Notifications";
+
+export default definePlugin({
+    name: "MyFirstPlugin",
+    description: "Shows a welcome notification when Discord starts",
+    authors: [
+        {
+            name: "YourName",
+            id: 0n  // Replace with your Discord user ID as BigInt
+        }
+    ],
+
+    start() {
+        showNotification({
+            title: "Plexcord is running!",
+            body: "Your plugin is active. Happy hacking 🎉",
+            color: "#43B581"
+        });
+    }
+});
+```
+
+---
+
+## How It Works
+
+1. **`definePlugin`** wraps your plugin definition, providing TypeScript intellisense and type safety.
+2. **`start()`** is called once when the plugin is enabled, either at Discord startup or when you toggle it on.
+3. **`showNotification`** displays a pop-up in the corner of Discord.
+
+---
+
+## Variations to Try
+
+### Add a stop action
+
+```typescript
+stop() {
+    showNotification({
+        title: "Plugin Disabled",
+        body: "MyFirstPlugin has been turned off.",
+        color: "#ED4245"
+    });
+}
+```
+
+### Make it a toast instead
+
+```typescript
+import { showToast, Toasts } from "@api/Notifications";
+
+start() {
+    showToast("Plugin loaded!", Toasts.Type.SUCCESS);
+}
+```
+
+---
+
+## Next Example
+
+<Cards>
+  <Card title="Keyword Alert" href="/docs/examples/keyword-alert">
+    Add settings and Flux event handling.
+  </Card>
+</Cards>

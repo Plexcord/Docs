@@ -1,0 +1,218 @@
+﻿---
+title: Quick Start
+description: Create your first Plexcord plugin in under 5 minutes. Step-by-step tutorial for writing a Hello Discord plugin from scratch.
+published: 2026-03-02
+tags: [quickstart, first-plugin, tutorial]
+---
+
+{/*
+ * This file is part of docs.plexcord.club.
+ * Copyright (c) 2026 Plexcord.
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ */}
+
+# Quick Start: Your First Plugin
+
+In this guide, you'll create a working Plexcord plugin from scratch in about 5 minutes.
+
+## What We're Building
+
+A `HelloDiscord` plugin that:
+- Logs a message when Discord starts
+- Logs a goodbye message when it stops
+- Shows a notification to confirm it's working
+
+## Step 1: Create the Plugin Folder
+
+Navigate to the `src/userplugins` directory inside your Plexcord clone and create a new folder:
+
+```bash
+mkdir src/userplugins/helloDiscord
+```
+
+## Step 2: Create the Plugin File
+
+Create `src/userplugins/helloDiscord/index.ts` with this content:
+
+```typescript
+import definePlugin from "@utils/types";
+
+export default definePlugin({
+    name: "HelloDiscord",
+    description: "My first Plexcord plugin!",
+    authors: [
+        {
+            name: "YourName",
+            id: 0n  // Your Discord user ID (optional)
+        }
+    ],
+
+    start() {
+        console.log("[HelloDiscord] Plugin started! Hello, Discord!");
+    },
+
+    stop() {
+        console.log("[HelloDiscord] Plugin stopped. Goodbye!");
+    }
+});
+```
+
+That's it! This is a complete, working Plexcord plugin.
+
+## Step 3: Build and Inject
+
+Rebuild Plexcord and inject it into Discord:
+
+```bash
+pnpm build
+pnpm inject
+```
+
+After each build, restart Discord to pick up your changes.
+
+## Step 4: Enable the Plugin
+
+1. Open Discord
+2. Go to **User Settings** → **Plexcord** → **Plugins**
+3. Find **HelloDiscord** in the list
+4. Toggle it **ON**
+
+## Step 5: Verify It Works
+
+Open the Developer Tools in Discord (`Ctrl+Shift+I` on Windows, `Cmd+Option+I` on Mac) and look at the **Console** tab. You should see:
+
+```
+[HelloDiscord] Plugin started! Hello, Discord!
+```
+
+**🎉 Congratulations!** You just built your first Plexcord plugin!
+
+## Understanding What You Wrote
+
+Let's break down each part:
+
+### `definePlugin()`
+
+```typescript
+import definePlugin from "@utils/types";
+
+export default definePlugin({ ... });
+```
+
+`definePlugin` is the core function from Plexcord's utilities. It takes a plugin definition object and returns a properly typed plugin. Every Plexcord plugin uses this.
+
+### Required Properties
+
+```typescript
+name: "HelloDiscord",         // Display name in the plugin list
+description: "...",           // Short description shown in settings
+authors: [{ name, id }],      // Plugin authors
+```
+
+These three fields are **always required**.
+
+### Lifecycle Methods
+
+```typescript
+start() { /* runs when plugin is enabled */ },
+stop()  { /* runs when plugin is disabled */ }
+```
+
+- `start()` is called when the plugin is enabled or Discord loads
+- `stop()` is called when the plugin is disabled. **Always clean up here.**
+
+## Upgrade: Add a Notification
+
+Let's make the plugin a bit more visible. Update `index.ts`:
+
+```typescript
+import definePlugin from "@utils/types";
+import { showNotification } from "@api/Notifications";
+
+export default definePlugin({
+    name: "HelloDiscord",
+    description: "My first Plexcord plugin!",
+    authors: [{ name: "YourName", id: 0n }],
+
+    start() {
+        console.log("[HelloDiscord] Plugin started!");
+
+        showNotification({
+            title: "HelloDiscord",
+            body: "Plugin is now active!",
+            color: "#5865F2"
+        });
+    },
+
+    stop() {
+        console.log("[HelloDiscord] Plugin stopped.");
+    }
+});
+```
+
+Rebuild with `pnpm build`, restart Discord, and enable the plugin. You'll see a notification appear in Discord.
+
+## Upgrade: Localize Your Strings
+
+The strings above are hardcoded in English. To support multiple languages, use `t()` from Plexcord's i18n API:
+
+```typescript
+import definePlugin from "@utils/types";
+import { showNotification } from "@api/Notifications";
+import { t, plugin } from "@api/i18n";
+
+export default definePlugin({
+    name: "HelloDiscord",
+    description: () => t(plugin.helloDiscord.description),
+    authors: [{ name: "YourName", id: 0n }],
+
+    start() {
+        showNotification({
+            title: t(plugin.helloDiscord.notif.title),
+            body: t(plugin.helloDiscord.notif.body),
+            color: "#5865F2"
+        });
+    },
+
+    stop() {
+        console.log("[HelloDiscord] Plugin stopped.");
+    }
+});
+```
+
+Then add the strings to `src/locales/en.ts` under `plugin.helloDiscord`, and mirror the same keys in any other locale files you want to support (`tr.ts`, `de.ts`, `fr.ts`, `ja.ts`, etc.). Plexcord automatically picks the right language based on the user's Discord locale. Users whose language doesn't have a translation automatically see English.
+
+See the full [i18n API reference](/docs/api-reference/i18n) for proxy key access, interpolation, and React hooks.
+
+## Common Mistakes
+
+| Mistake | Fix |
+|---------|-----|
+| Plugin doesn't appear in list | Check for TypeScript compile errors with `pnpm tsc --noEmit` |
+| `start()` not running | Make sure the plugin is toggled ON in settings |
+| Import errors | Ensure you're using `@utils/types` path alias, not relative paths |
+| Build not updating | Re-run `pnpm build` and fully reload Discord |
+
+## Next Steps
+
+<Cards>
+  <Card title="Plugin Structure" href="/docs/getting-started/plugin-structure">
+    Learn all the properties of definePlugin in depth.
+  </Card>
+  <Card title="Adding Settings" href="/docs/getting-started/adding-settings">
+    Add a settings panel to your plugin.
+  </Card>
+</Cards>

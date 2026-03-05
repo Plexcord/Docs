@@ -1,0 +1,312 @@
+﻿---
+title: Patches System
+description: Modify Discord's JavaScript source code at runtime using Plexcord's regex-based patches system. Learn find, replacement, match, replace, and advanced patterns.
+published: 2026-03-02
+tags: [patches, webpack, regex, code-modification, advanced]
+---
+
+{/*
+ * This file is part of docs.plexcord.club.
+ * Copyright (c) 2026 Plexcord.
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ */}
+
+# Patches System
+
+Patches are Plexcord's most powerful feature. They allow you to **modify Discord's JavaScript code at runtime**, changing behavior that would otherwise be impossible to alter.
+
+<Callout type="warning">
+  Patches are powerful but fragile. Discord updates can break them without warning. Always test patches after Discord updates and handle failures gracefully.
+</Callout>
+
+## How Patches Work
+
+Plexcord intercepts Discord's Webpack module loading process. Before a module is executed, active patches are applied, replacing matching code with your replacement code.
+
+```
+Discord                  Plexcord
+─────────              ───────────
+Webpack                Patch applied:
+module.js  ──────────► match regex → replace → modified module.js
+                                                │
+                                                ▼
+                                        Executed by Discord
+```
+
+The entire process happens synchronously before the module runs, so your replacement is always in effect.
+
+## Basic Patch Structure
+
+```typescript
+import definePlugin from "@utils/types";
+
+export default definePlugin({
+    name: "MyPatch",
+    description: "Modifies a Discord function",
+    authors: [{ name: "You", id: 0n }],
+
+    patches: [
+        {
+            // find: String or regex that identifies the MODULE to patch
+            // Must uniquely match the module containing what you want to change
+            find: "someUniqueStringInTheModule",
+
+            replacement: {
+                // match: Regex that matches the SPECIFIC CODE to replace within the module
+                match: /functionToModify\((\w+)\)/,
+
+                // replace: What to replace the match with
+                // $1, $2... are regex capture groups
+                replace: "functionToModify($1, extraArg)"
+            }
+        }
+    ]
+});
+```
+
+## The `find` Property
+
+`find` identifies which module to patch. It must be **unique**; if it matches multiple modules, you get unexpected results.
+
+```typescript
+// String find: looks for this exact string in module source
+find: "MessageStore.getMessages",
+
+// Regex find: more precise matching
+find: /exports\.sendMessage\s*=\s*function/
+```
+
+### How to find the right value
+
+1. Open Discord DevTools (`Ctrl+Shift+I`)
+2. Go to the **Sources** tab
+3. Use `Ctrl+Shift+F` to search across all sources
+4. Search for a unique string near the code you want to patch
+5. Make sure only **one** module contains that string
+
+## The `replacement` Property
+
+`replacement` specifies what to replace and what to replace it with.
+
+### Simple replacement
+
+```typescript
+replacement: {
+    match: /\.premium/g,        // Match all occurrences
+    replace: ".superPremium"    // Replace with this
+}
+```
+
+### Capture group replacement
+
+```typescript
+replacement: {
+    // Capture the argument list
+    match: /checkPermissions\((\w+),\s*(\w+)\)/,
+    // Re-use capture groups with $1, $2
+    replace: "checkPermissions($1, $2, true /* override */)"
+}
+```
+
+### Multiple replacements in one patch
+
+```typescript
+patches: [
+    {
+        find: "someModule",
+        replacement: [
+            // First replacement
+            {
+                match: /condition1/,
+                replace: "newCondition1"
+            },
+            // Second replacement (on the same module)
+            {
+                match: /condition2/,
+                replace: "newCondition2"
+            }
+        ]
+    }
+]
+```
+
+## Real-World Examples
+
+### Example 1: Bypass a Rate Limit Check
+
+```typescript
+patches: [
+    {
+        find: "MESSAGE_SEND_BEFORE_UNLOAD",
+        replacement: {
+            match: /if\s*\(\w+\.cooldown\s*&&/,
+            replace: "if (false && "  // Always skip the cooldown check
+        }
+    }
+]
+```
+
+### Example 2: Inject a Custom Property
+
+```typescript
+patches: [
+    {
+        find: "renderMessageContent",
+        replacement: {
+            // Match function return, capture existing render
+            match: /return\s+(renderMessageContent\([^)]+\))/,
+            // Wrap with our decorator
+            replace: "return myPlugin.wrapContent($1)"
+        }
+    }
+]
+```
+
+### Example 3: Replace a Function Entirely
+
+```typescript
+patches: [
+    {
+        find: "calculateBadgeCount",
+        replacement: {
+            match: /function calculateBadgeCount\([^)]*\)\s*\{[^}]+\}/,
+            replace: "function calculateBadgeCount(userId) { return 0; }"
+        }
+    }
+]
+```
+
+## Patch Options
+
+### `predicate`: Conditional Patches
+
+Apply a patch only when a condition is met:
+
+```typescript
+patches: [
+    {
+        find: "someModule",
+        predicate: () => settings.store.enablePatch,  // Only patch if setting is on
+        replacement: {
+            match: /someCode/,
+            replace: "newCode"
+        }
+    }
+]
+```
+
+### `all`: Patch All Matching Modules
+
+When multiple modules contain the same `find` string and you want to patch all of them:
+
+```typescript
+patches: [
+    {
+        find: "commonPatternInManyModules",
+        all: true,  // Apply to every matching module
+        replacement: {
+            match: /regex/,
+            replace: "replacement"
+        }
+    }
+]
+```
+
+### `noWarn`: Suppress Patch Failure Warnings
+
+By default, Plexcord logs a warning if a patch fails (e.g., after a Discord update). Suppress it for optional patches:
+
+```typescript
+patches: [
+    {
+        find: "maybeExistFeature",
+        noWarn: true,  // Don't warn if this doesn't match
+        replacement: {
+            match: /optionalCode/,
+            replace: "enhancedCode"
+        }
+    }
+]
+```
+
+## Injecting Plugin Functions
+
+Often you want to call your own plugin code from inside Discord's patched code. Use `self` from the Webpack context:
+
+```typescript
+import { addContextMenuPatch } from "@api/ContextMenu";
+
+export default definePlugin({
+    name: "InjectExample",
+    description: "Injects plugin function into Discord code",
+    authors: [{ name: "You", id: 0n }],
+
+    myCustomFunction(arg: string) {
+        console.log("Called from patch with:", arg);
+    },
+
+    patches: [
+        {
+            find: "someModule",
+            replacement: {
+                match: /doSomething\((\w+)\)/,
+                // Access plugin via Plexcord.Plugins.plugins.PluginName
+                replace: (_, arg) =>
+                    `(Vencord.Plugins.plugins.InjectExample.myCustomFunction(${arg}), doSomething(${arg}))`
+            }
+        }
+    ]
+});
+```
+
+## Debugging Patches
+
+### Check if your patch applied
+
+```javascript
+// In DevTools console:
+// Look for your module and verify the replacement happened
+Vencord.Webpack.findAll(m => m.toString?.().includes("yourReplacedCode"))
+```
+
+### Failed patch indicators
+
+In the DevTools console, failed patches show as:
+
+```
+[Plexcord] Patch "YourPluginName > someModule" had no effect
+```
+
+This means the `match` regex didn't find anything in the module. After a Discord update, re-inspect the module source and update your regex.
+
+## Patch Safety Tips
+
+1. **Be as specific as possible** with your `match` regex
+2. **Capture and re-use** code you don't want to remove (using `$1`, `$2`, etc.)
+3. **Use `noWarn: true`** for optional patches that may not always exist
+4. **Test after every Discord update**
+5. **Keep patches small**: the smaller the change, the less likely it breaks
+
+## Next Steps
+
+<Cards>
+  <Card title="Commands System" href="/docs/advanced-features/commands">
+    Add slash commands to Discord with your plugin.
+  </Card>
+  <Card title="Flux Events" href="/docs/advanced-features/flux-events">
+    Subscribe to Discord's internal event system.
+  </Card>
+</Cards>
