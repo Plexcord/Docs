@@ -24,7 +24,7 @@ const withMDX = createMDX();
 const config = {
   output: 'standalone',
   distDir: 'dist',
-  serverExternalPackages: ['@takumi-rs/image-response'],
+  serverExternalPackages: ['@takumi-rs/image-response', '@takumi-rs/core', 'takumi-js'],
   reactStrictMode: true,
   outputFileTracingIncludes: {
     '/**': ['./node_modules/styled-jsx/**/*'],

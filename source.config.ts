@@ -22,7 +22,8 @@ import { z } from 'zod';
 
 // Extended schema for SEO-optimized frontmatter
 const extendedPageSchema = pageSchema.extend({
-  published: z.date().optional(),
+  // fumadocs-mdx 15 leaves YAML dates as strings
+  published: z.coerce.date().optional(),
   author: z.string().optional(),
   tags: z.array(z.string()).optional(),
   image: z.string().optional(),
