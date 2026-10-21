@@ -7,7 +7,7 @@
     "build": "next build",
     "postbuild": "node -e \"const {cpSync}=require('fs');cpSync('node_modules/.pnpm/node_modules/styled-jsx','dist/standalone/node_modules/styled-jsx',{recursive:true,force:true})\"",
     "dev": "next dev",
-    "start": "next start",
+    "start": "next start -p 5623",
     "types:check": "fumadocs-mdx && next typegen && tsc --noEmit",
     "postinstall": "fumadocs-mdx",
     "lint": "eslint"
